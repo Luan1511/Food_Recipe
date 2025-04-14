@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "625705405309",
+    "project_id": "bp3foodrecipe",
+    "storage_bucket": "bp3foodrecipe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:625705405309:android:191ef7f1be8662b4695a14",
+        "android_client_info": {
+          "package_name": "com.example.baseproject3_foodrecipe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdSGUXvMIjOAmxmYwsMTSDVEMmMoWkO_k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme (Light Mode) -->
+    <style name="Theme.FoodRecipe" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Primary colors -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+
+        <!-- Secondary/accent colors -->
+        <item name="colorSecondary">@color/accent</item>
+        <item name="colorSecondaryVariant">@color/sushi_highlight</item>
+        <item name="colorOnSecondary">@color/text_dark</item>
+
+        <!-- Background/surface colors -->
+        <item name="android:windowBackground">@color/background</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/text_dark</item>
+
+        <!-- Error color -->
+        <item name="colorError">@color/error</item>
+        <item name="colorOnError">@color/white</item>
+
+        <!-- Status bar -->
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        <item name="android:navigationBarColor">@color/background</item>
+
+<!--        &lt;!&ndash; Typography &ndash;&gt;-->
+<!--        <item name="android:fontFamily">@font/roboto_regular</item>-->
+<!--        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.FoodRecipe.Headline.Small</item>-->
+
+<!--        &lt;!&ndash; Button styles &ndash;&gt;-->
+<!--        <item name="materialButtonStyle">@style/Widget.FoodRecipe.Button</item>-->
+<!--        <item name="buttonStyle">@style/Widget.FoodRecipe.Button</item>-->
+
+<!--        &lt;!&ndash; CardView &ndash;&gt;-->
+<!--        <item name="cardViewStyle">@style/Widget.FoodRecipe.Card</item>-->
+
+<!--        &lt;!&ndash; Custom attributes for food categories &ndash;&gt;-->
+<!--        <item name="veggieColor">@color/veggie</item>-->
+<!--        <item name="meatColor">@color/meat</item>-->
+    </style>
+
+    <!-- Text appearance styles -->
+<!--    <style name="TextAppearance.FoodRecipe.Headline.Small" parent="TextAppearance.Material3.HeadlineSmall">-->
+<!--        <item name="android:textColor">@color/text_dark</item>-->
+<!--        <item name="android:fontFamily">@font/roboto_bold</item>-->
+<!--    </style>-->
+
+    <!-- Button style -->
+<!--    <style name="Widget.FoodRecipe.Button" parent="Widget.Material3.Button">-->
+<!--        <item name="android:textColor">@color/text_on_primary</item>-->
+<!--        <item name="android:backgroundTint">@color/primary</item>-->
+<!--        <item name="android:paddingVertical">12dp</item>-->
+<!--        <item name="android:paddingHorizontal">24dp</item>-->
+<!--        <item name="shapeAppearance">@style/ShapeAppearance.FoodRecipe.Medium</item>-->
+<!--    </style>-->
+
+<!--    &lt;!&ndash; Card style &ndash;&gt;-->
+<!--&lt;!&ndash;    <style name="Widget.FoodRecipe.Card" parent="Widget.Material3.CardView">&ndash;&gt;-->
+<!--        <item name="strokeColor">@color/border</item>-->
+<!--        <item name="strokeWidth">1dp</item>-->
+<!--        <item name="cardElevation">4dp</item>-->
+<!--        <item name="cardBackgroundColor">@color/surface</item>-->
+<!--    </style>-->
+
+    <!-- Shape appearance -->
+    <style name="ShapeAppearance.FoodRecipe.Medium" parent="ShapeAppearance.Material3.MediumComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
+    </style>
+
+    <!-- Dark theme variation -->
+    <style name="Theme.FoodRecipe.Dark" parent="Theme.FoodRecipe">
+        <item name="android:windowBackground">@color/text_dark</item>
+        <item name="colorSurface">@color/text_dark</item>
+        <item name="colorOnSurface">@color/white</item>
+        <item name="cardBackgroundColor">@color/text_light</item>
+    </style>
+</resources>
