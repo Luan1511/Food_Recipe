@@ -193,4 +193,37 @@ class RecipeRepository {
             false
         }
     }
+
+    suspend fun isRecipeSaved(recipeId: String, userId: String): Boolean {
+        return try {
+            withContext(Dispatchers.IO) {
+                val userDoc = usersCollection.document(userId).get().await()
+                val savedRecipes = userDoc.get("savedRecipes") as? List<String> ?: emptyList()
+                recipeId in savedRecipes
+            }
+        } catch (e: Exception) {
+            Log.e("RecipeRepository", "Error checking if recipe is saved: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun searchRecipes(query: String): List<Recipe> {
+        return try {
+            withContext(Dispatchers.IO) {
+                // Get all recipes and filter locally
+                // This is a simple implementation - in a real app, you'd use Firestore's search capabilities
+                val allRecipes = getRecipes()
+
+                allRecipes.filter { recipe ->
+                    recipe.name.contains(query, ignoreCase = true) ||
+                            recipe.description.contains(query, ignoreCase = true) ||
+                            recipe.categories.any { it.contains(query, ignoreCase = true) } ||
+                            recipe.ingredients.any { it.contains(query, ignoreCase = true) }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("RecipeRepository", "Error searching recipes: ${e.message}")
+            emptyList()
+        }
+    }
 }

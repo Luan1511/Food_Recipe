@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -24,12 +25,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.rememberAsyncImagePainter
 import com.example.baseproject3_foodrecipe.R
 import com.example.baseproject3_foodrecipe.model.Recipe
 import com.example.baseproject3_foodrecipe.ui.theme.md_extended_rating
+import com.example.baseproject3_foodrecipe.viewmodel.CommentViewModel
+import com.example.baseproject3_foodrecipe.viewmodel.RatingViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.RecipeViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.UserViewModel
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,16 +43,46 @@ fun RecipeDetailScreen(
     navController: NavController,
     recipeId: String,
     recipeViewModel: RecipeViewModel = viewModel(),
-    userViewModel: UserViewModel = viewModel()
+    userViewModel: UserViewModel = viewModel(),
+    commentViewModel: CommentViewModel = viewModel(),
+    ratingViewModel: RatingViewModel = viewModel()
 ) {
     val currentRecipe by recipeViewModel.currentRecipe.collectAsState()
     val isLoading by recipeViewModel.isLoading.collectAsState()
     val currentUser by userViewModel.currentUser.collectAsState()
-    var isBookmarked by remember { mutableStateOf(false) }
+    val comments by commentViewModel.comments.collectAsState()
+    val userRating by ratingViewModel.userRating.collectAsState()
 
-    // Load recipe data
-    LaunchedEffect(recipeId) {
+    var isBookmarked by remember { mutableStateOf(false) }
+    var showRatingDialog by remember { mutableStateOf(false) }
+    var showCommentSection by remember { mutableStateOf(false) }
+    var commentText by remember { mutableStateOf("") }
+
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Load recipe data and check if it's bookmarked
+    LaunchedEffect(recipeId, currentUser) {
         recipeViewModel.getRecipeById(recipeId)
+        currentUser?.id?.let { userId ->
+//            isBookmarked = recipeViewModel.isRecipeSaved(recipeId, userId)
+            ratingViewModel.getUserRating(recipeId, userId)
+        }
+        commentViewModel.getCommentsByRecipe(recipeId)
+    }
+
+    // Rating dialog
+    if (showRatingDialog) {
+        RatingDialog(
+            currentRating = userRating ?: 0.0,
+            onDismiss = { showRatingDialog = false },
+            onRateRecipe = { rating ->
+                currentUser?.id?.let { userId ->
+                    ratingViewModel.rateRecipe(recipeId, userId, rating)
+                    showRatingDialog = false
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -60,10 +96,18 @@ fun RecipeDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        isBookmarked = !isBookmarked
-                        // In a real app, we would save this to the database
                         currentUser?.id?.let { userId ->
-                            // recipeViewModel.bookmarkRecipe(recipeId, userId)
+                            coroutineScope.launch {
+                                if (isBookmarked) {
+                                    recipeViewModel.unbookmarkRecipe(recipeId, userId)
+                                    isBookmarked = false
+                                    snackbarHostState.showSnackbar("Recipe removed from saved")
+                                } else {
+                                    recipeViewModel.bookmarkRecipe(recipeId, userId)
+                                    isBookmarked = true
+                                    snackbarHostState.showSnackbar("Recipe saved")
+                                }
+                            }
                         }
                     }) {
                         Icon(
@@ -73,7 +117,8 @@ fun RecipeDetailScreen(
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         if (isLoading || currentRecipe == null) {
             Box(
@@ -88,9 +133,27 @@ fun RecipeDetailScreen(
             RecipeDetailContent(
                 recipe = currentRecipe!!,
                 modifier = Modifier.padding(paddingValues),
-                onCommentClick = { /* TODO: Open comments */ },
+                onCommentClick = { showCommentSection = !showCommentSection },
                 onAuthorClick = { authorId ->
                     navController.navigate("profile/$authorId")
+                },
+                onRateClick = { showRatingDialog = true },
+                userRating = userRating,
+                comments = comments,
+                showComments = showCommentSection,
+                commentText = commentText,
+                onCommentTextChange = { commentText = it },
+                onAddComment = {
+                    if (commentText.isNotBlank() && currentUser != null) {
+                        commentViewModel.addComment(
+                            recipeId = recipeId,
+                            userId = currentUser!!.id,
+                            userName = currentUser!!.name,
+                            userImageUrl = currentUser!!.profileImageUrl,
+                            content = commentText
+                        )
+                        commentText = ""
+                    }
                 }
             )
         }
@@ -102,7 +165,14 @@ fun RecipeDetailContent(
     recipe: Recipe,
     modifier: Modifier = Modifier,
     onCommentClick: () -> Unit,
-    onAuthorClick: (String) -> Unit
+    onAuthorClick: (String) -> Unit,
+    onRateClick: () -> Unit,
+    userRating: Double?,
+    comments: List<com.example.baseproject3_foodrecipe.model.Comment>,
+    showComments: Boolean,
+    commentText: String,
+    onCommentTextChange: (String) -> Unit,
+    onAddComment: () -> Unit
 ) {
     Column(
         modifier = modifier
@@ -111,14 +181,25 @@ fun RecipeDetailContent(
     ) {
         // Recipe Image
         Box {
-            Image(
-                painter = painterResource(id = R.drawable.italian_pasta), // Replace with actual image
-                contentDescription = recipe.name,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(250.dp),
-                contentScale = ContentScale.Crop
-            )
+            if (recipe.imageUrl.isNotEmpty()) {
+                Image(
+                    painter = rememberAsyncImagePainter(recipe.imageUrl),
+                    contentDescription = recipe.name,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(250.dp),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = R.drawable.italian_pasta),
+                    contentDescription = recipe.name,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(250.dp),
+                    contentScale = ContentScale.Crop
+                )
+            }
 
             // Time and cuisine badges
             Row(
@@ -213,7 +294,8 @@ fun RecipeDetailContent(
             ) {
                 // Rating
                 Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.clickable(onClick = onRateClick)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically
@@ -229,6 +311,13 @@ fun RecipeDetailContent(
                         text = "${recipe.rating} (${recipe.ratingCount})",
                         style = MaterialTheme.typography.bodyMedium
                     )
+                    if (userRating != null) {
+                        Text(
+                            text = "Your rating: $userRating",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
 
                 // Calories
@@ -333,6 +422,215 @@ fun RecipeDetailContent(
                     )
                 }
             }
+
+            // Comments Section
+            if (showComments) {
+                Divider(modifier = Modifier.padding(vertical = 16.dp))
+
+                Text(
+                    text = "Comments",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Add comment
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = commentText,
+                        onValueChange = onCommentTextChange,
+                        placeholder = { Text("Add a comment...") },
+                        modifier = Modifier.weight(1f),
+                        maxLines = 3
+                    )
+
+                    IconButton(
+                        onClick = onAddComment,
+                        enabled = commentText.isNotBlank()
+                    ) {
+                        Icon(
+                            Icons.Default.Send,
+                            contentDescription = "Send",
+                            tint = if (commentText.isBlank()) Color.Gray else MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Comments list
+                if (comments.isEmpty()) {
+                    Text(
+                        text = "No comments yet. Be the first to comment!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(vertical = 16.dp)
+                    )
+                } else {
+                    comments.forEach { comment ->
+                        CommentItem(comment = comment)
+                    }
+                }
+            }
         }
     }
+}
+
+@Composable
+fun CommentItem(comment: com.example.baseproject3_foodrecipe.model.Comment) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // User avatar
+            Image(
+                painter = if (comment.userImageUrl.isNotEmpty())
+                    rememberAsyncImagePainter(comment.userImageUrl)
+                else
+                    painterResource(id = R.drawable.chef_avatar),
+                contentDescription = "User Avatar",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = comment.userName,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+
+                Text(
+                    text = formatTimestamp(comment.timestamp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = comment.content,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(start = 48.dp, end = 16.dp)
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Row(
+            modifier = Modifier.padding(start = 48.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = { /* Like comment */ },
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    Icons.Default.ThumbUp,
+                    contentDescription = "Like",
+                    modifier = Modifier.size(16.dp),
+                    tint = Color.Gray
+                )
+            }
+
+            Text(
+                text = "${comment.likes}",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
+        }
+
+        Divider(
+            modifier = Modifier
+                .padding(top = 8.dp)
+                .padding(start = 48.dp)
+        )
+    }
+}
+
+@Composable
+fun RatingDialog(
+    currentRating: Double,
+    onDismiss: () -> Unit,
+    onRateRecipe: (Double) -> Unit
+) {
+    var rating by remember { mutableStateOf(currentRating) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rate this recipe") },
+        text = {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Tap to rate",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    repeat(5) { index ->
+                        val starRating = index + 1
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "Star $starRating",
+                            tint = if (starRating <= rating) md_extended_rating else Color.Gray,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clickable { rating = starRating.toDouble() }
+                                .padding(4.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = rating.toString(),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onRateRecipe(rating) }) {
+                Text("Rate")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+fun formatTimestamp(timestamp: Long): String {
+    val date = Date(timestamp)
+    val format = SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault())
+    return format.format(date)
 }

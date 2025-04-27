@@ -104,7 +104,7 @@ fun HomeScreen(
                     )
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO: Search action */ }) {
+                    IconButton(onClick = { navController.navigate("search") }) {
                         Icon(Icons.Default.Search, contentDescription = "Tìm kiếm")
                     }
                     IconButton(onClick = { /* TODO: Notifications action */ }) {
@@ -139,7 +139,7 @@ fun HomeScreen(
                     icon = { Icon(painterResource(id = R.drawable.ic_saved), contentDescription = "Đã lưu") },
                     label = { Text("Đã lưu") },
                     selected = false,
-                    onClick = { /* TODO: Navigate to saved */ }
+                    onClick = { navController.navigate("saved_recipes") }
                 )
                 NavigationBarItem(
                     icon = { Icon(painterResource(id = R.drawable.ic_profile), contentDescription = "Hồ sơ") },

@@ -156,4 +156,79 @@ class UserRepository {
             false
         }
     }
+
+    suspend fun followUser(currentUserId: String, targetUserId: String): Boolean {
+        return try {
+            withContext(Dispatchers.IO) {
+                // Update current user's following count
+                val currentUser = getUser(currentUserId)
+                if (currentUser != null) {
+                    usersCollection.document(currentUserId)
+                        .update("following", currentUser.following + 1)
+                        .await()
+                }
+
+                // Update target user's followers count
+                val targetUser = getUser(targetUserId)
+                if (targetUser != null) {
+                    usersCollection.document(targetUserId)
+                        .update("followers", targetUser.followers + 1)
+                        .await()
+                }
+
+                true
+            }
+        } catch (e: Exception) {
+            Log.e("UserRepository", "Error following user: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun unfollowUser(currentUserId: String, targetUserId: String): Boolean {
+        return try {
+            withContext(Dispatchers.IO) {
+                // Update current user's following count
+                val currentUser = getUser(currentUserId)
+                if (currentUser != null && currentUser.following > 0) {
+                    usersCollection.document(currentUserId)
+                        .update("following", currentUser.following - 1)
+                        .await()
+                }
+
+                // Update target user's followers count
+                val targetUser = getUser(targetUserId)
+                if (targetUser != null && targetUser.followers > 0) {
+                    usersCollection.document(targetUserId)
+                        .update("followers", targetUser.followers - 1)
+                        .await()
+                }
+
+                true
+            }
+        } catch (e: Exception) {
+            Log.e("UserRepository", "Error unfollowing user: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun searchUsers(query: String): List<User> {
+        return try {
+            withContext(Dispatchers.IO) {
+                // Get all users and filter locally
+                // In a real app, you'd use Firestore's search capabilities
+                val snapshot = usersCollection.get().await()
+                val allUsers = snapshot.documents.mapNotNull { it.toObject(User::class.java) }
+
+                allUsers.filter { user ->
+                    user.name.contains(query, ignoreCase = true) ||
+                            user.username.contains(query, ignoreCase = true) ||
+                            user.email.contains(query, ignoreCase = true) ||
+                            user.bio.contains(query, ignoreCase = true)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("UserRepository", "Error searching users: ${e.message}")
+            emptyList()
+        }
+    }
 }
