@@ -1,5 +1,6 @@
 package com.example.baseproject3_foodrecipe.view
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,8 +17,11 @@ import androidx.navigation.navArgument
 import com.example.baseproject3_foodrecipe.ui.theme.FoodRecipeTheme
 import com.example.baseproject3_foodrecipe.viewmodel.AuthViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.BlogViewModel
+import com.example.baseproject3_foodrecipe.viewmodel.CommentViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.ImageUploadViewModel
+import com.example.baseproject3_foodrecipe.viewmodel.RatingViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.RecipeViewModel
+import com.example.baseproject3_foodrecipe.viewmodel.SearchViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.UserViewModel
 
 class MainActivity : ComponentActivity() {
@@ -27,7 +31,11 @@ class MainActivity : ComponentActivity() {
     private lateinit var authViewModel: AuthViewModel
     private lateinit var imageUploadViewModel: ImageUploadViewModel
     private lateinit var blogViewModel: BlogViewModel
+    private lateinit var commentViewModel: CommentViewModel
+    private lateinit var ratingViewModel: RatingViewModel
+    private lateinit var searchViewModel: SearchViewModel
 
+    @SuppressLint("StateFlowValueCalledInComposition")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -37,6 +45,9 @@ class MainActivity : ComponentActivity() {
         authViewModel = ViewModelProvider(this)[AuthViewModel::class.java]
         imageUploadViewModel = ViewModelProvider(this)[ImageUploadViewModel::class.java]
         blogViewModel = ViewModelProvider(this)[BlogViewModel::class.java]
+        commentViewModel = ViewModelProvider(this)[CommentViewModel::class.java]
+        ratingViewModel = ViewModelProvider(this)[RatingViewModel::class.java]
+        searchViewModel = ViewModelProvider(this)[SearchViewModel::class.java]
 
         setContent {
             FoodRecipeTheme {
@@ -77,7 +88,8 @@ class MainActivity : ComponentActivity() {
                             HomeScreen(
                                 navController = navController,
                                 recipeViewModel = recipeViewModel,
-                                userViewModel = userViewModel
+                                userViewModel = userViewModel,
+                                authViewModel = authViewModel
                             )
                         }
 
@@ -90,7 +102,9 @@ class MainActivity : ComponentActivity() {
                                 navController = navController,
                                 recipeId = recipeId,
                                 recipeViewModel = recipeViewModel,
-                                userViewModel = userViewModel
+                                userViewModel = userViewModel,
+                                commentViewModel = commentViewModel,
+                                ratingViewModel = ratingViewModel
                             )
                         }
 
@@ -121,7 +135,8 @@ class MainActivity : ComponentActivity() {
                                 navController = navController,
                                 userId = userId,
                                 userViewModel = userViewModel,
-                                recipeViewModel = recipeViewModel
+                                recipeViewModel = recipeViewModel,
+                                authViewModel = authViewModel
                             )
                         }
 
@@ -170,6 +185,14 @@ class MainActivity : ComponentActivity() {
                             BlogScreen(
                                 navController = navController,
                                 blogViewModel = blogViewModel
+                            )
+                        }
+
+                        // Add search screen
+                        composable("search") {
+                            SearchScreen(
+                                navController = navController,
+                                searchViewModel = searchViewModel
                             )
                         }
                     }

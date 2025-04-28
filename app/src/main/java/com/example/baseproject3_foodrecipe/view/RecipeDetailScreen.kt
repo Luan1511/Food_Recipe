@@ -55,7 +55,7 @@ fun RecipeDetailScreen(
 
     var isBookmarked by remember { mutableStateOf(false) }
     var showRatingDialog by remember { mutableStateOf(false) }
-    var showCommentSection by remember { mutableStateOf(false) }
+    var showCommentSection by remember { mutableStateOf(true) }
     var commentText by remember { mutableStateOf("") }
 
     val coroutineScope = rememberCoroutineScope()
@@ -65,7 +65,7 @@ fun RecipeDetailScreen(
     LaunchedEffect(recipeId, currentUser) {
         recipeViewModel.getRecipeById(recipeId)
         currentUser?.id?.let { userId ->
-//            isBookmarked = recipeViewModel.isRecipeSaved(recipeId, userId)
+            isBookmarked = recipeViewModel.isRecipeSaved(recipeId, userId)
             ratingViewModel.getUserRating(recipeId, userId)
         }
         commentViewModel.getCommentsByRecipe(recipeId)

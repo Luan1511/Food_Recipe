@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 class UserRepository {
     private val db = FirebaseFirestore.getInstance()
     private val usersCollection = db.collection("users")
+    private val followsCollection = db.collection("follows")
 
     suspend fun getUser(userId: String): User? {
         return try {
@@ -157,9 +158,42 @@ class UserRepository {
         }
     }
 
+    suspend fun isFollowingUser(currentUserId: String, targetUserId: String): Boolean {
+        return try {
+            withContext(Dispatchers.IO) {
+                val followDoc = followsCollection
+                    .whereEqualTo("followerId", currentUserId)
+                    .whereEqualTo("followingId", targetUserId)
+                    .get()
+                    .await()
+
+                !followDoc.isEmpty
+            }
+        } catch (e: Exception) {
+            Log.e("UserRepository", "Error checking follow status: ${e.message}")
+            false
+        }
+    }
+
     suspend fun followUser(currentUserId: String, targetUserId: String): Boolean {
         return try {
             withContext(Dispatchers.IO) {
+                // Check if already following
+                if (isFollowingUser(currentUserId, targetUserId)) {
+                    return@withContext true
+                }
+
+                // Create follow relationship
+                val followId = "${currentUserId}_${targetUserId}"
+                val followData = hashMapOf(
+                    "id" to followId,
+                    "followerId" to currentUserId,
+                    "followingId" to targetUserId,
+                    "timestamp" to System.currentTimeMillis()
+                )
+
+                followsCollection.document(followId).set(followData).await()
+
                 // Update current user's following count
                 val currentUser = getUser(currentUserId)
                 if (currentUser != null) {
@@ -187,6 +221,15 @@ class UserRepository {
     suspend fun unfollowUser(currentUserId: String, targetUserId: String): Boolean {
         return try {
             withContext(Dispatchers.IO) {
+                // Check if actually following
+                if (!isFollowingUser(currentUserId, targetUserId)) {
+                    return@withContext true
+                }
+
+                // Delete follow relationship
+                val followId = "${currentUserId}_${targetUserId}"
+                followsCollection.document(followId).delete().await()
+
                 // Update current user's following count
                 val currentUser = getUser(currentUserId)
                 if (currentUser != null && currentUser.following > 0) {

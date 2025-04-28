@@ -35,6 +35,7 @@ import com.example.baseproject3_foodrecipe.viewmodel.RecipeViewModel
 import kotlinx.coroutines.launch
 import coil.compose.rememberAsyncImagePainter
 import com.example.baseproject3_foodrecipe.viewmodel.ImageUploadViewModel
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,7 +96,11 @@ fun CreateRecipeScreen(
                                 var imageUrl = ""
                                 if (imageUri != null) {
                                     imageUploadViewModel.uploadImage(imageUri!!, "recipes/${userId}_${System.currentTimeMillis()}")
-                                    // Wait for upload to complete
+                                    // Wait for upload to complete and ensure we have the URL
+                                    while (uploadState.isLoading) {
+                                        // Wait for upload to complete
+                                        delay(100)
+                                    }
                                     if (uploadState.isSuccess) {
                                         imageUrl = uploadState.downloadUrl ?: ""
                                     }
@@ -519,7 +524,11 @@ fun CreateRecipeScreen(
                             var imageUrl = ""
                             if (imageUri != null) {
                                 imageUploadViewModel.uploadImage(imageUri!!, "recipes/${userId}_${System.currentTimeMillis()}")
-                                // Wait for upload to complete
+                                // Wait for upload to complete and ensure we have the URL
+                                while (uploadState.isLoading) {
+                                    // Wait for upload to complete
+                                    delay(100)
+                                }
                                 if (uploadState.isSuccess) {
                                     imageUrl = uploadState.downloadUrl ?: ""
                                 }

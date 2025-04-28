@@ -42,11 +42,28 @@ fun ProfileScreen(
     val currentUser by userViewModel.currentUser.collectAsState()
     val userRecipes by userViewModel.userRecipes.collectAsState()
     val isLoading by userViewModel.isLoading.collectAsState()
-    val isCurrentUserProfile = authViewModel.currentUser.collectAsState().value?.uid == userId
+    val errorMessage by userViewModel.errorMessage.collectAsState()
+    val currentAuthUser = authViewModel.currentUser.collectAsState().value
+    val isCurrentUserProfile = currentAuthUser?.uid == userId
+
+    // State for follow button
+    var isFollowing by remember { mutableStateOf(false) }
+    var followButtonEnabled by remember { mutableStateOf(true) }
+
+    // Snackbar for notifications
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     // Load user data
     LaunchedEffect(userId) {
         userViewModel.getUserById(userId)
+    }
+
+    // Check if current user is following this user
+    LaunchedEffect(currentUser, currentAuthUser) {
+        if (currentUser != null && currentAuthUser != null && !isCurrentUserProfile) {
+            isFollowing = userViewModel.isFollowingUser(currentAuthUser.uid, userId)
+        }
     }
 
     val showLogoutDialog = remember { mutableStateOf(false) }
@@ -75,6 +92,16 @@ fun ProfileScreen(
                 }
             }
         )
+    }
+
+    // Show error messages
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(it)
+                userViewModel.clearError()
+            }
+        }
     }
 
     Scaffold(
@@ -107,7 +134,8 @@ fun ProfileScreen(
                     Icon(Icons.Default.Add, contentDescription = "Create Recipe")
                 }
             }
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         if (isLoading || currentUser == null) {
             Box(
@@ -126,7 +154,29 @@ fun ProfileScreen(
                 onRecipeClick = { recipeId ->
                     navController.navigate("recipe_detail/$recipeId")
                 },
-                isCurrentUserProfile = isCurrentUserProfile
+                isCurrentUserProfile = isCurrentUserProfile,
+                isFollowing = isFollowing,
+                onFollowClick = {
+                    if (currentAuthUser != null) {
+                        followButtonEnabled = false
+                        coroutineScope.launch {
+                            val success = if (isFollowing) {
+                                userViewModel.unfollowUser(currentAuthUser.uid, userId)
+                            } else {
+                                userViewModel.followUser(currentAuthUser.uid, userId)
+                            }
+
+                            if (success) {
+                                isFollowing = !isFollowing
+                                val message = if (isFollowing) "Now following ${currentUser!!.name}" else "Unfollowed ${currentUser!!.name}"
+                                snackbarHostState.showSnackbar(message)
+                            } else {
+                                snackbarHostState.showSnackbar("Failed to update follow status")
+                            }
+                            followButtonEnabled = true
+                        }
+                    }
+                }
             )
         }
     }
@@ -138,7 +188,9 @@ fun ProfileContent(
     recipes: List<Recipe>,
     modifier: Modifier = Modifier,
     onRecipeClick: (String) -> Unit,
-    isCurrentUserProfile: Boolean
+    isCurrentUserProfile: Boolean,
+    isFollowing: Boolean,
+    onFollowClick: () -> Unit
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize()
@@ -253,10 +305,24 @@ fun ProfileContent(
                     }
                 } else {
                     Button(
-                        onClick = { /* TODO: Follow user */ },
-                        modifier = Modifier.width(200.dp)
+                        onClick = onFollowClick,
+                        modifier = Modifier.width(200.dp),
+                        colors = if (isFollowing) {
+                            ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            ButtonDefaults.buttonColors()
+                        }
                     ) {
-                        Text("Theo dõi")
+                        Icon(
+                            if (isFollowing) Icons.Default.Check else Icons.Default.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(if (isFollowing) "Đang theo dõi" else "Theo dõi")
                     }
                 }
             }

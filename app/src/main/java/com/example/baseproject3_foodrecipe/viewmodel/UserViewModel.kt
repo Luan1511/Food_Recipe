@@ -48,7 +48,7 @@ class UserViewModel : ViewModel() {
                 username = "chefmichael",
                 email = "chef@example.com",
                 bio = "Professional chef specializing in Italian cuisine",
-//                isChef = true,
+                chef = true,
                 chefTitle = "Executive Chef"
             )
             userRepository.createUser(defaultUser)
@@ -87,31 +87,39 @@ class UserViewModel : ViewModel() {
         }
     }
 
-    fun followUser(targetUserId: String) {
-        viewModelScope.launch {
-            try {
-                val currentUserId = _currentUser.value?.id ?: return@launch
-//                userRepository.followUser(currentUserId, targetUserId)
+    suspend fun isFollowingUser(currentUserId: String, targetUserId: String): Boolean {
+        return userRepository.isFollowingUser(currentUserId, targetUserId)
+    }
 
-                // Refresh current user to update UI
-                getUserById(currentUserId)
-            } catch (e: Exception) {
-                _errorMessage.value = "Failed to follow user: ${e.message}"
+    suspend fun followUser(currentUserId: String, targetUserId: String): Boolean {
+        return try {
+            val success = userRepository.followUser(currentUserId, targetUserId)
+
+            // Refresh current user to update UI
+            if (success) {
+                getUserById(targetUserId)
             }
+
+            success
+        } catch (e: Exception) {
+            _errorMessage.value = "Failed to follow user: ${e.message}"
+            false
         }
     }
 
-    fun unfollowUser(targetUserId: String) {
-        viewModelScope.launch {
-            try {
-                val currentUserId = _currentUser.value?.id ?: return@launch
-//                userRepository.unfollowUser(currentUserId, targetUserId)
+    suspend fun unfollowUser(currentUserId: String, targetUserId: String): Boolean {
+        return try {
+            val success = userRepository.unfollowUser(currentUserId, targetUserId)
 
-                // Refresh current user to update UI
-                getUserById(currentUserId)
-            } catch (e: Exception) {
-                _errorMessage.value = "Failed to unfollow user: ${e.message}"
+            // Refresh current user to update UI
+            if (success) {
+                getUserById(targetUserId)
             }
+
+            success
+        } catch (e: Exception) {
+            _errorMessage.value = "Failed to unfollow user: ${e.message}"
+            false
         }
     }
 
@@ -140,5 +148,9 @@ class UserViewModel : ViewModel() {
     // For demo purposes, get the current user ID
     fun getCurrentUserId(): String {
         return defaultUserId
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
     }
 }

@@ -214,4 +214,13 @@ class RecipeViewModel : ViewModel() {
             }
         }
     }
+
+    suspend fun isRecipeSaved(recipeId: String, userId: String): Boolean {
+        return try {
+            repository.isRecipeSaved(recipeId, userId)
+        } catch (e: Exception) {
+            _errorMessage.value = "Error checking if recipe is saved: ${e.message}"
+            false
+        }
+    }
 }
