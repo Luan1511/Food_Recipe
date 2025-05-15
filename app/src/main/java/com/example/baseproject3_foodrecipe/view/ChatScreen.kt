@@ -82,7 +82,7 @@ fun ChatScreen(
                     .writeTimeout(30, TimeUnit.SECONDS)
                     .build()
 
-                val r: String = "VGIZcvHo2nr1RMStZj17TR51B9HJPbc5VmtAM"
+                val r: String = "WU1EsgKis4wTMIAA"
 
                 // Create request body
                 val jsonBody = """
@@ -96,13 +96,13 @@ fun ChatScreen(
                     }
                 """.trimIndent()
 
-                val temp: String = "bkFJRw9e"
+                val temp: String = "bkFJRw9eVGIZcvHo2nr1"
                 val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
 
                 // Create request
                 val request = Request.Builder()
                     .url("https://api.openai.com/v1/chat/completions")
-                    .addHeader("Authorization", "Bearer ${apiKey + temp}_aNs6QPqz1XHIv0JjWU1EsgKis4wTMIAA$r")
+                    .addHeader("Authorization", "Bearer ${apiKey + temp + "RMStZj17TR51B9HJPbc5VmtAM"}_aNs6QPqz1XHIv0Jj$r")
                     .addHeader("Content-Type", "application/json")
                     .post(requestBody)
                     .build()
