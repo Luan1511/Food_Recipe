@@ -49,7 +49,7 @@ data class ChatMessage(
 @Composable
 fun ChatScreen(
     navController: NavController,
-    apiKey: String = "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" // This is just a placeholder, the actual key is set by the user
+    apiKey: String = "sk-abcxyz" // This is just a placeholder, the actual key is set by the user
 ) {
     // State for chat messages
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
