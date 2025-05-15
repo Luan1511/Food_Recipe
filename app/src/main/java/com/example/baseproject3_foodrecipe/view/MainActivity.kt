@@ -1,201 +1,283 @@
 package com.example.baseproject3_foodrecipe.view
 
-import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.baseproject3_foodrecipe.ui.theme.FoodRecipeTheme
-import com.example.baseproject3_foodrecipe.viewmodel.AuthViewModel
-import com.example.baseproject3_foodrecipe.viewmodel.BlogViewModel
-import com.example.baseproject3_foodrecipe.viewmodel.CommentViewModel
-import com.example.baseproject3_foodrecipe.viewmodel.ImageUploadViewModel
-import com.example.baseproject3_foodrecipe.viewmodel.RatingViewModel
-import com.example.baseproject3_foodrecipe.viewmodel.RecipeViewModel
-import com.example.baseproject3_foodrecipe.viewmodel.SearchViewModel
-import com.example.baseproject3_foodrecipe.viewmodel.UserViewModel
+import com.example.baseproject3_foodrecipe.viewmodel.*
 
 class MainActivity : ComponentActivity() {
-    // Initialize ViewModels at the activity level
-    private lateinit var recipeViewModel: RecipeViewModel
-    private lateinit var userViewModel: UserViewModel
-    private lateinit var authViewModel: AuthViewModel
-    private lateinit var imageUploadViewModel: ImageUploadViewModel
-    private lateinit var blogViewModel: BlogViewModel
-    private lateinit var commentViewModel: CommentViewModel
-    private lateinit var ratingViewModel: RatingViewModel
-    private lateinit var searchViewModel: SearchViewModel
-
-    @SuppressLint("StateFlowValueCalledInComposition")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Initialize ViewModels
-        recipeViewModel = ViewModelProvider(this)[RecipeViewModel::class.java]
-        userViewModel = ViewModelProvider(this)[UserViewModel::class.java]
-        authViewModel = ViewModelProvider(this)[AuthViewModel::class.java]
-        imageUploadViewModel = ViewModelProvider(this)[ImageUploadViewModel::class.java]
-        blogViewModel = ViewModelProvider(this)[BlogViewModel::class.java]
-        commentViewModel = ViewModelProvider(this)[CommentViewModel::class.java]
-        ratingViewModel = ViewModelProvider(this)[RatingViewModel::class.java]
-        searchViewModel = ViewModelProvider(this)[SearchViewModel::class.java]
-
         setContent {
             FoodRecipeTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val navController = rememberNavController()
+                    FoodRecipeApp()
+                }
+            }
+        }
+    }
+}
 
-                    NavHost(
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FoodRecipeApp() {
+    val navController = rememberNavController()
+    val authViewModel: AuthViewModel = viewModel()
+    val currentUser by authViewModel.currentUser.collectAsState()
+
+    Scaffold(
+        bottomBar = {
+            // Only show bottom navigation on main screens and when user is logged in
+            val navBackStackEntry by navController.currentBackStackEntryAsState()
+            val currentRoute = navBackStackEntry?.destination?.route
+
+            val mainRoutes = listOf("home", "planner", "saved", "videos", "blog")
+            val showBottomBar = (mainRoutes.any { route ->
+                currentRoute == route || currentRoute?.startsWith("$route/") == true
+            } || currentRoute?.startsWith("profile/") == true) && currentUser != null
+
+            if (showBottomBar) {
+                BottomNavigation(
+                    navController = navController,
+                    authViewModel = authViewModel
+                )
+            }
+        }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            NavHost(navController = navController, startDestination = "home") {
+                // Main screens
+                composable("home") {
+                    HomeScreen(navController = navController)
+                }
+                composable("planner") {
+                    MealPlannerScreen(
                         navController = navController,
-                        startDestination = if (authViewModel.currentUser.value != null) "home" else "login"
-                    ) {
-                        // Auth screens
-                        composable("login") {
-                            LoginScreen(
-                                navController = navController,
-                                authViewModel = authViewModel
-                            )
-                        }
+                        mealPlanViewModel = viewModel()
+                    )
+                }
+                composable("saved") {
+                    SavedRecipesScreen(
+                        navController = navController,
+                        recipeViewModel = viewModel()
+                    )
+                }
+                composable("videos") {
+                    VideoScreen(
+                        navController = navController
+                    )
+                }
 
-                        composable("register") {
-                            RegisterScreen(
-                                navController = navController,
-                                authViewModel = authViewModel
-                            )
-                        }
+                // Main blog screen
+                composable("blog") {
+                    BlogListScreen(
+                        navController = navController,
+                        blogViewModel = viewModel()
+                    )
+                }
 
-                        composable("forgot_password") {
-                            ForgotPasswordScreen(
-                                navController = navController,
-                                authViewModel = authViewModel
-                            )
-                        }
+                // Profile screen with userId parameter
+                composable(
+                    "profile/{userId}",
+                    arguments = listOf(navArgument("userId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val userId = backStackEntry.arguments?.getString("userId") ?: ""
+                    ProfileScreen(
+                        navController = navController,
+                        userId = userId,
+                        userViewModel = viewModel(),
+                        authViewModel = authViewModel,
+                        blogViewModel = viewModel()
+                    )
+                }
 
-                        // Main app screens
-                        composable("home") {
-                            HomeScreen(
-                                navController = navController,
-                                recipeViewModel = recipeViewModel,
-                                userViewModel = userViewModel,
-                                authViewModel = authViewModel
-                            )
-                        }
+                // Authentication screens
+                composable("login") {
+                    LoginScreen(
+                        navController = navController,
+                        authViewModel = authViewModel
+                    )
+                }
+                composable("register") {
+                    RegisterScreen(
+                        navController = navController,
+                        authViewModel = authViewModel
+                    )
+                }
+                composable("forgot_password") {
+                    ForgotPasswordScreen(
+                        navController = navController,
+                        authViewModel = authViewModel
+                    )
+                }
 
-                        composable(
-                            "recipe_detail/{recipeId}",
-                            arguments = listOf(navArgument("recipeId") { type = NavType.StringType })
-                        ) { backStackEntry ->
-                            val recipeId = backStackEntry.arguments?.getString("recipeId") ?: ""
-                            RecipeDetailScreen(
-                                navController = navController,
-                                recipeId = recipeId,
-                                recipeViewModel = recipeViewModel,
-                                userViewModel = userViewModel,
-                                commentViewModel = commentViewModel,
-                                ratingViewModel = ratingViewModel
-                            )
-                        }
+                // Recipe screens
+                composable(
+                    "recipe_detail/{recipeId}",
+                    arguments = listOf(navArgument("recipeId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val recipeId = backStackEntry.arguments?.getString("recipeId") ?: ""
+                    RecipeDetailScreen(
+                        recipeId = recipeId,
+                        navController = navController,
+                        recipeViewModel = viewModel(),
+                        commentViewModel = viewModel(),
+                        ratingViewModel = viewModel()
+                    )
+                }
+                composable("create_recipe") {
+                    // Get current user ID from AuthViewModel
+                    val userId = currentUser?.uid ?: ""
+                    val userName = currentUser?.displayName ?: "Anonymous"
 
-                        composable(
-                            "create_recipe/{userId}/{userName}",
-                            arguments = listOf(
-                                navArgument("userId") { type = NavType.StringType },
-                                navArgument("userName") { type = NavType.StringType }
-                            )
-                        ) { backStackEntry ->
-                            val userId = backStackEntry.arguments?.getString("userId") ?: ""
-                            val userName = backStackEntry.arguments?.getString("userName") ?: ""
-                            CreateRecipeScreen(
-                                navController = navController,
-                                userId = userId,
-                                userName = userName,
-                                recipeViewModel = recipeViewModel,
-                                imageUploadViewModel = imageUploadViewModel
-                            )
-                        }
+                    CreateRecipeScreen(
+                        navController = navController,
+                        recipeViewModel = viewModel(),
+                        imageUploadViewModel = viewModel(),
+                        userId = userId,
+                        userName = userName
+                    )
+                }
+                composable("my_recipes") {
+                    MyRecipesScreen(
+                        navController = navController,
+                        recipeViewModel = viewModel()
+                    )
+                }
+                composable("search") {
+                    SearchScreen(
+                        navController = navController,
+                        searchViewModel = viewModel()
+                    )
+                }
 
-                        composable(
-                            "profile/{userId}",
-                            arguments = listOf(navArgument("userId") { type = NavType.StringType })
-                        ) { backStackEntry ->
-                            val userId = backStackEntry.arguments?.getString("userId") ?: ""
-                            ProfileScreen(
-                                navController = navController,
-                                userId = userId,
-                                userViewModel = userViewModel,
-                                recipeViewModel = recipeViewModel,
-                                authViewModel = authViewModel
-                            )
-                        }
+                // Category screen
+                composable(
+                    "category/{category}",
+                    arguments = listOf(navArgument("category") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val category = backStackEntry.arguments?.getString("category") ?: ""
+                    CategoryScreen(
+                        category = category,
+                        navController = navController,
+                        recipeViewModel = viewModel()
+                    )
+                }
 
-                        composable(
-                            "video_player/{recipeId}",
-                            arguments = listOf(navArgument("recipeId") { type = NavType.StringType })
-                        ) { backStackEntry ->
-                            val recipeId = backStackEntry.arguments?.getString("recipeId") ?: ""
-                            VideoPlayerScreen(
-                                navController = navController,
-                                recipeId = recipeId,
-                                recipeViewModel = recipeViewModel
-                            )
-                        }
+                // Blog screens
+                composable(
+                    "blog_detail/{blogId}",
+                    arguments = listOf(navArgument("blogId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val blogId = backStackEntry.arguments?.getString("blogId") ?: ""
+                    BlogScreen(
+                        navController = navController,
+                        blogId = blogId,
+                        blogViewModel = viewModel()
+                    )
+                }
+                composable("create_blog") {
+                    // Get current user ID from AuthViewModel
+                    val userId = currentUser?.uid ?: ""
+                    val userName = currentUser?.displayName ?: "Anonymous"
 
-                        composable(
-                            "category/{categoryName}",
-                            arguments = listOf(navArgument("categoryName") { type = NavType.StringType })
-                        ) { backStackEntry ->
-                            val categoryName = backStackEntry.arguments?.getString("categoryName") ?: ""
-                            CategoryScreen(
-                                navController = navController,
-                                categoryName = categoryName,
-                                recipeViewModel = recipeViewModel
-                            )
-                        }
+                    CreateBlogScreen(
+                        navController = navController,
+                        blogViewModel = viewModel(),
+                        imageUploadViewModel = viewModel(),
+//                        userId = userId,
+//                        userName = userName
+                    )
+                }
+                composable("my_blogs") {
+                    // Get current user ID from AuthViewModel
+                    val userId = currentUser?.uid ?: ""
 
-                        // New screens
-                        composable("saved_recipes") {
-                            SavedRecipesScreen(
-                                navController = navController,
-                                userViewModel = userViewModel,
-                                recipeViewModel = recipeViewModel
-                            )
-                        }
+                    MyBlogsScreen(
+                        navController = navController,
+                        blogViewModel = viewModel(),
+                        userId = userId
+                    )
+                }
 
-                        composable("my_recipes") {
-                            MyRecipesScreen(
-                                navController = navController,
-                                userViewModel = userViewModel,
-                                recipeViewModel = recipeViewModel
-                            )
-                        }
+                // Meal planner screens
+                composable("add_meal/{date}/{mealType}",
+                    arguments = listOf(
+                        navArgument("date") { type = NavType.StringType },
+                        navArgument("mealType") { type = NavType.StringType }
+                    )
+                ) { backStackEntry ->
+                    val date = backStackEntry.arguments?.getString("date") ?: ""
+                    val mealType = backStackEntry.arguments?.getString("mealType") ?: ""
+                    AddMealScreen(
+                        date = date,
+                        mealType = mealType,
+                        navController = navController,
+                        mealPlanViewModel = viewModel(),
+                        recipeViewModel = viewModel()
+                    )
+                }
 
-                        composable("blog") {
-                            BlogScreen(
-                                navController = navController,
-                                blogViewModel = blogViewModel
-                            )
-                        }
+                // YouTube video screens
+                composable("video_search") {
+                    VideoSearchScreen(
+                        navController = navController
+                    )
+                }
+                composable(
+                    "youtube_player/{videoId}",
+                    arguments = listOf(navArgument("videoId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val videoId = backStackEntry.arguments?.getString("videoId") ?: ""
+                    YouTubePlayerScreen(
+                        videoId = videoId,
+                        navController = navController
+                    )
+                }
 
-                        // Add search screen
-                        composable("search") {
-                            SearchScreen(
-                                navController = navController,
-                                searchViewModel = searchViewModel
-                            )
-                        }
-                    }
+                // Food recognition screen
+                composable("food_recognition") {
+                    FoodRecognitionScreen(
+                        navController = navController,
+                        recipeViewModel = viewModel()
+                    )
+                }
+
+                // Admin Panel
+                composable("admin_panel") {
+                    AdminPanel(
+                        navController = navController,
+                        authViewModel = authViewModel,
+                        recipeViewModel = viewModel(),
+                        blogViewModel = viewModel(),
+                        userViewModel = viewModel()
+                    )
                 }
             }
         }

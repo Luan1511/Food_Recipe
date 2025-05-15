@@ -19,15 +19,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.baseproject3_foodrecipe.R
 import com.example.baseproject3_foodrecipe.model.Recipe
-import com.example.baseproject3_foodrecipe.ui.theme.*
+import com.example.baseproject3_foodrecipe.model.YouTubeVideo
+import com.example.baseproject3_foodrecipe.utils.LocalImageStorage
+import com.example.baseproject3_foodrecipe.viewmodel.YouTubeViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeContent(
@@ -36,423 +42,284 @@ fun HomeContent(
     featuredRecipes: List<Recipe>,
     popularRecipes: List<Recipe>
 ) {
+    val scrollState = rememberScrollState()
+    val youtubeViewModel: YouTubeViewModel = viewModel()
+    val trendingVideos by youtubeViewModel.trendingVideos.collectAsState()
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
+            .verticalScroll(scrollState)
+            .padding(bottom = 80.dp) // Add padding for bottom navigation
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        // Welcome Section
+        WelcomeSection()
 
-        // Featured Videos Section
-        Text(
-            text = "Featured Videos",
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp
-            )
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
+        // Featured Recipes Section
         if (featuredRecipes.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
+            SectionTitle("Featured Recipes")
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Take first two recipes for featured videos
-                val videoRecipes = featuredRecipes.take(2)
-
-                videoRecipes.forEach { recipe ->
-                    VideoCard(
-                        title = recipe.name,
-                        chef = recipe.authorName,
-                        imageRes = R.drawable.italian_pasta, // Use placeholder for now
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            navController.navigate("video_player/${recipe.id}")
-                        }
+                items(featuredRecipes) { recipe ->
+                    RecipeCardComponent(
+                        recipe = recipe,
+                        onClick = { navController.navigate("recipe_detail/${recipe.id}") },
+                        modifier = Modifier.width(280.dp)
                     )
                 }
-
-                // If we don't have enough recipes, add placeholders
-                if (videoRecipes.size < 2) {
-                    repeat(2 - videoRecipes.size) {
-                        VideoCard(
-                            title = "Coming Soon",
-                            chef = "Chef",
-                            imageRes = R.drawable.italian_pasta,
-                            modifier = Modifier.weight(1f),
-                            onClick = { }
-                        )
-                    }
-                }
             }
-        } else {
-            // Placeholder if no recipes
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                VideoCard(
-                    title = "Italian Pasta",
-                    chef = "Chef Mario",
-                    imageRes = R.drawable.italian_pasta,
-                    modifier = Modifier.weight(1f),
-                    onClick = { }
-                )
-
-                VideoCard(
-                    title = "Sushi Making",
-                    chef = "Chef Yuki",
-                    imageRes = R.drawable.italian_pasta,
-                    modifier = Modifier.weight(1f),
-                    onClick = { }
-                )
-            }
+            Spacer(modifier = Modifier.height(24.dp))
         }
-
-        Spacer(modifier = Modifier.height(32.dp))
 
         // Popular Recipes Section
-        Text(
-            text = "Popular Recipes",
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp
-            )
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-
         if (popularRecipes.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
+            SectionTitle("Popular Recipes")
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Take first two popular recipes
-                val topRecipes = popularRecipes.take(2)
-
-                topRecipes.forEach { recipe ->
-                    RecipeCard(
-                        title = recipe.name,
-                        cookingTime = "${recipe.totalTime} min",
-                        difficulty = recipe.difficulty,
-                        imageRes = R.drawable.italian_pasta, // Use placeholder for now
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            navController.navigate("recipe_detail/${recipe.id}")
-                        }
+                items(popularRecipes) { recipe ->
+                    RecipeCardComponent(
+                        recipe = recipe,
+                        onClick = { navController.navigate("recipe_detail/${recipe.id}") },
+                        modifier = Modifier.width(280.dp)
                     )
                 }
-
-                // If we don't have enough recipes, add placeholders
-                if (topRecipes.size < 2) {
-                    repeat(2 - topRecipes.size) {
-                        RecipeCard(
-                            title = "Coming Soon",
-                            cookingTime = "30 min",
-                            difficulty = "Easy",
-                            imageRes = R.drawable.italian_pasta,
-                            modifier = Modifier.weight(1f),
-                            onClick = { }
-                        )
-                    }
-                }
             }
-        } else {
-            // Placeholder if no recipes
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                RecipeCard(
-                    title = "Butter Chicken",
-                    cookingTime = "30 min",
-                    difficulty = "Medium",
-                    imageRes = R.drawable.italian_pasta,
-                    modifier = Modifier.weight(1f),
-                    onClick = { }
-                )
+            Spacer(modifier = Modifier.height(24.dp))
+        }
 
-                RecipeCard(
-                    title = "Chocolate Cake",
-                    cookingTime = "45 min",
-                    difficulty = "Easy",
-                    imageRes = R.drawable.italian_pasta,
-                    modifier = Modifier.weight(1f),
-                    onClick = { }
+        // YouTube Cooking Videos Section
+        SectionTitle("Cooking Videos")
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            items(trendingVideos) { video ->
+                VideoCard(
+                    video = video,
+                    onClick = { navController.navigate("youtube_player/${video.id}") },
+                    modifier = Modifier.width(280.dp)
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Categories Section
+        SectionTitle("Categories")
+        CategoriesSection(navController)
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Video Recipes
+
+
+        Spacer(modifier = Modifier.height(80.dp)) // Bottom spacing for FAB
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WelcomeSection() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
         Text(
-            text = "Categories",
+            text = "What would you like to cook today?",
             style = MaterialTheme.typography.headlineSmall.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp
+                fontWeight = FontWeight.Bold
             )
         )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Discover recipes, videos, and cooking tips",
+            style = MaterialTheme.typography.bodyLarge.copy(
+                color = Color.Gray
+            )
+        )
+
         Spacer(modifier = Modifier.height(16.dp))
 
-        Row(
+        // Search Bar
+        OutlinedTextField(
+            value = "",
+            onValueChange = { },
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            CategoryItem(
-                title = "Asian",
-                iconRes = R.drawable.ic_asian,
-                backgroundColor = Color(0xFFFFF3E0),
-                iconTint = md_food_sushi,
-                onClick = { navController.navigate("category/Asian") }
-            )
-
-            CategoryItem(
-                title = "Italian",
-                iconRes = R.drawable.ic_italian,
-                backgroundColor = Color(0xFFFFEBEE),
-                iconTint = Color(0xFFE53935),
-                onClick = { navController.navigate("category/Italian") }
-            )
-
-            CategoryItem(
-                title = "Vegan",
-                iconRes = R.drawable.ic_vegan,
-                backgroundColor = Color(0xFFE8F5E9),
-                iconTint = md_food_veggie,
-                onClick = { navController.navigate("category/Vegan") }
-            )
-
-            CategoryItem(
-                title = "Desserts",
-                iconRes = R.drawable.ic_dessert,
-                backgroundColor = Color(0xFFF3E5F5),
-                iconTint = md_food_dessert,
-                onClick = { navController.navigate("category/Dessert") }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Blog Section
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Food Blog",
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp
-                )
-            )
-
-            TextButton(
-                onClick = { navController.navigate("blog") }
-            ) {
-                Text("View All")
+            placeholder = { Text("Search recipes...") },
+            leadingIcon = {
                 Icon(
-                    Icons.Default.ArrowForward,
-                    contentDescription = "View All",
-                    modifier = Modifier.size(16.dp)
+                    Icons.Default.Search,
+                    contentDescription = "Search"
                 )
-            }
-        }
-
-        // Blog preview
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { navController.navigate("blog") },
+            },
             shape = RoundedCornerShape(12.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column {
-                Image(
-                    painter = painterResource(id = R.drawable.italian_pasta),
-                    contentDescription = "Blog Preview",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp),
-                    contentScale = ContentScale.Crop
-                )
-
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "Latest Food Trends",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Discover the latest culinary trends and get inspired for your next cooking adventure.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Chef Michael",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = Color.Gray
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.width(16.dp))
-
-                        Icon(
-                            Icons.Default.AccessTime,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "5 min read",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = Color.Gray
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
+            colors = TextFieldDefaults.outlinedTextFieldColors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = Color.LightGray
+            )
+        )
     }
 }
 
 @Composable
-fun VideoCard(
-    title: String,
-    chef: String,
-    imageRes: Int,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = modifier
-            .height(220.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+fun SectionTitle(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+    )
+}
+
+@Composable
+fun CategoriesSection(navController: NavController) {
+    val categories = listOf(
+        Triple("Asian", "ic_asian", "asian"),
+        Triple("Italian", "ic_italian", "italian"),
+        Triple("Vegan", "ic_vegan", "vegan"),
+        Triple("Dessert", "ic_dessert", "dessert")
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Box {
-            Image(
-                painter = painterResource(id = imageRes),
-                contentDescription = title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+        categories.forEach { (name, icon, route) ->
+            CategoryItem(
+                name = name,
+                iconName = icon,
+                onClick = { navController.navigate("category/$route") }
             )
-
-            // Offline indicator instead of LIVE
-            Box(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF4CAF50))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                    .align(Alignment.TopStart)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        "PLAY",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomStart)
-                    .background(Color(0x99000000))
-                    .padding(8.dp)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-                Text(
-                    text = chef,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
-                )
-            }
         }
     }
 }
 
 @Composable
 fun CategoryItem(
-    title: String,
-    iconRes: Int,
-    backgroundColor: Color,
-    iconTint: Color,
+    name: String,
+    iconName: String,
     onClick: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier
+            .width(80.dp)
+            .clickable(onClick = onClick)
     ) {
         Box(
             modifier = Modifier
-                .size(80.dp)
+                .size(64.dp)
                 .clip(CircleShape)
-                .background(backgroundColor),
+                .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
+            val icon = when (iconName) {
+                "ic_asian" -> R.drawable.ic_asian
+                "ic_italian" -> R.drawable.ic_italian
+                "ic_vegan" -> R.drawable.ic_vegan
+                "ic_dessert" -> R.drawable.ic_dessert
+                else -> R.drawable.ic_launcher_foreground // Fallback icon
+            }
             Icon(
-                painter = painterResource(id = iconRes),
-                contentDescription = title,
-                modifier = Modifier.size(36.dp),
-                tint = iconTint
+                painter = painterResource(id = icon),
+                contentDescription = name,
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = title,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontWeight = FontWeight.Medium
-            )
+            text = name,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+@Composable
+fun RecipeCardComponent(
+    recipe: Recipe,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var recipeBitmap by remember { mutableStateOf<Any?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(recipe.imageUrl) {
+        if (recipe.imageUrl.isNotEmpty()) {
+            coroutineScope.launch {
+                if (LocalImageStorage.fileExists(context, recipe.imageUrl)) {
+                    recipeBitmap = LocalImageStorage.loadImage(context, recipe.imageUrl)
+                }
+            }
+        }
+    }
+
+    Card(
+        modifier = modifier
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column {
+            // Recipe image
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+            ) {
+                if (recipeBitmap != null) {
+                    AsyncImage(
+                        model = recipeBitmap,
+                        contentDescription = recipe.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = recipe.name.take(1),
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Column(modifier = Modifier.padding(8.dp)) {
+                Text(
+                    text = recipe.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = recipe.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }

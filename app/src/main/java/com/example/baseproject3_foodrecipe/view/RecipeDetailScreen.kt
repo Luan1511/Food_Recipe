@@ -1,5 +1,7 @@
 package com.example.baseproject3_foodrecipe.view
 
+import android.graphics.Bitmap
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,24 +18,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.baseproject3_foodrecipe.R
 import com.example.baseproject3_foodrecipe.model.Recipe
 import com.example.baseproject3_foodrecipe.ui.theme.md_extended_rating
+import com.example.baseproject3_foodrecipe.utils.LocalImageStorage
 import com.example.baseproject3_foodrecipe.viewmodel.CommentViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.RatingViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.RecipeViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.UserViewModel
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -60,25 +64,53 @@ fun RecipeDetailScreen(
 
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
+    // For local image loading
+    var recipeBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     // Load recipe data and check if it's bookmarked
     LaunchedEffect(recipeId, currentUser) {
         recipeViewModel.getRecipeById(recipeId)
+
         currentUser?.id?.let { userId ->
-            isBookmarked = recipeViewModel.isRecipeSaved(recipeId, userId)
-            ratingViewModel.getUserRating(recipeId, userId)
+            try {
+                isBookmarked = recipeViewModel.isRecipeSaved(recipeId, userId)
+                ratingViewModel.getUserRatingForRecipe(userId, recipeId)
+            } catch (e: Exception) {
+                Log.e("RecipeDetailScreen", "Error checking bookmark status: ${e.message}", e)
+            }
         }
-        commentViewModel.getCommentsByRecipe(recipeId)
+        commentViewModel.loadCommentsByRecipeId(recipeId)
+    }
+
+    // Load local image if path exists
+    LaunchedEffect(currentRecipe) {
+        currentRecipe?.let { recipe ->
+            if (recipe.imageUrl.isNotEmpty()) {
+                try {
+                    recipeBitmap = LocalImageStorage.loadImage(context, recipe.imageUrl)
+                } catch (e: Exception) {
+                    // Handle error loading image
+                }
+            }
+        }
     }
 
     // Rating dialog
     if (showRatingDialog) {
         RatingDialog(
-            currentRating = userRating ?: 0.0,
+            currentRating = userRating?.value?.toDouble() ?: 0.0,
             onDismiss = { showRatingDialog = false },
             onRateRecipe = { rating ->
                 currentUser?.id?.let { userId ->
-                    ratingViewModel.rateRecipe(recipeId, userId, rating)
+                    ratingViewModel.addRating(
+                        recipeId = recipeId,
+                        userId = userId,
+                        userName = currentUser?.name ?: "",
+                        value = rating.toFloat(),
+                        comment = ""
+                    )
                     showRatingDialog = false
                 }
             }
@@ -98,21 +130,31 @@ fun RecipeDetailScreen(
                     IconButton(onClick = {
                         currentUser?.id?.let { userId ->
                             coroutineScope.launch {
-                                if (isBookmarked) {
-                                    recipeViewModel.unbookmarkRecipe(recipeId, userId)
-                                    isBookmarked = false
-                                    snackbarHostState.showSnackbar("Recipe removed from saved")
-                                } else {
-                                    recipeViewModel.bookmarkRecipe(recipeId, userId)
-                                    isBookmarked = true
-                                    snackbarHostState.showSnackbar("Recipe saved")
+                                try {
+                                    if (isBookmarked) {
+                                        recipeViewModel.unbookmarkRecipe(recipeId, userId)
+                                        isBookmarked = false
+                                        snackbarHostState.showSnackbar("Recipe removed from saved")
+                                    } else {
+                                        recipeViewModel.bookmarkRecipe(recipeId, userId)
+                                        isBookmarked = true
+                                        snackbarHostState.showSnackbar("Recipe saved")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("RecipeDetailScreen", "Error bookmarking: ${e.message}", e)
+                                    snackbarHostState.showSnackbar("Failed to update bookmark: ${e.message}")
                                 }
+                            }
+                        } ?: run {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Please log in to bookmark recipes")
                             }
                         }
                     }) {
                         Icon(
                             if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                            contentDescription = "Bookmark"
+                            contentDescription = "Bookmark",
+                            tint = if (isBookmarked) MaterialTheme.colorScheme.primary else Color.Gray
                         )
                     }
                 }
@@ -132,6 +174,8 @@ fun RecipeDetailScreen(
         } else {
             RecipeDetailContent(
                 recipe = currentRecipe!!,
+                recipeBitmap = recipeBitmap,
+                navController = navController,
                 modifier = Modifier.padding(paddingValues),
                 onCommentClick = { showCommentSection = !showCommentSection },
                 onAuthorClick = { authorId ->
@@ -149,7 +193,7 @@ fun RecipeDetailScreen(
                             recipeId = recipeId,
                             userId = currentUser!!.id,
                             userName = currentUser!!.name,
-                            userImageUrl = currentUser!!.profileImageUrl,
+                            userProfileImage = currentUser!!.profileImageUrl,
                             content = commentText
                         )
                         commentText = ""
@@ -163,11 +207,13 @@ fun RecipeDetailScreen(
 @Composable
 fun RecipeDetailContent(
     recipe: Recipe,
+    recipeBitmap: Bitmap?,
+    navController: NavController,
     modifier: Modifier = Modifier,
     onCommentClick: () -> Unit,
     onAuthorClick: (String) -> Unit,
     onRateClick: () -> Unit,
-    userRating: Double?,
+    userRating: com.example.baseproject3_foodrecipe.model.Rating?,
     comments: List<com.example.baseproject3_foodrecipe.model.Comment>,
     showComments: Boolean,
     commentText: String,
@@ -181,9 +227,10 @@ fun RecipeDetailContent(
     ) {
         // Recipe Image
         Box {
-            if (recipe.imageUrl.isNotEmpty()) {
+            if (recipeBitmap != null) {
+                // Display local image
                 Image(
-                    painter = rememberAsyncImagePainter(recipe.imageUrl),
+                    bitmap = recipeBitmap.asImageBitmap(),
                     contentDescription = recipe.name,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -191,6 +238,7 @@ fun RecipeDetailContent(
                     contentScale = ContentScale.Crop
                 )
             } else {
+                // Display default image
                 Image(
                     painter = painterResource(id = R.drawable.italian_pasta),
                     contentDescription = recipe.name,
@@ -313,7 +361,7 @@ fun RecipeDetailContent(
                     )
                     if (userRating != null) {
                         Text(
-                            text = "Your rating: $userRating",
+                            text = "Your rating: ${userRating.value}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -423,6 +471,40 @@ fun RecipeDetailContent(
                 }
             }
 
+            // YouTube Video Section
+            recipe.youtubeVideoId?.let { videoId ->
+                if (videoId.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Video Tutorial",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        modifier = Modifier.padding(horizontal = 0.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { navController.navigate("youtube_player/$videoId") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = "Play Video",
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Watch Video Tutorial")
+                        }
+                    }
+                }
+            }
+
             // Comments Section
             if (showComments) {
                 Divider(modifier = Modifier.padding(vertical = 16.dp))
@@ -483,6 +565,20 @@ fun RecipeDetailContent(
 
 @Composable
 fun CommentItem(comment: com.example.baseproject3_foodrecipe.model.Comment) {
+    val context = LocalContext.current
+    var commentUserBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    // Load user image in a coroutine
+    LaunchedEffect(comment.userProfileImage) {
+        if (comment.userProfileImage.isNotEmpty()) {
+            try {
+                commentUserBitmap = LocalImageStorage.loadImage(context, comment.userProfileImage)
+            } catch (e: Exception) {
+                // Handle error loading image
+            }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -492,17 +588,25 @@ fun CommentItem(comment: com.example.baseproject3_foodrecipe.model.Comment) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             // User avatar
-            Image(
-                painter = if (comment.userImageUrl.isNotEmpty())
-                    rememberAsyncImagePainter(comment.userImageUrl)
-                else
-                    painterResource(id = R.drawable.chef_avatar),
-                contentDescription = "User Avatar",
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
+            if (commentUserBitmap != null) {
+                Image(
+                    bitmap = commentUserBitmap!!.asImageBitmap(),
+                    contentDescription = "User Avatar",
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = R.drawable.chef_avatar),
+                    contentDescription = "User Avatar",
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            }
 
             Spacer(modifier = Modifier.width(8.dp))
 

@@ -1,5 +1,6 @@
 package com.example.baseproject3_foodrecipe.view
 
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,22 +21,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.baseproject3_foodrecipe.R
+import coil.compose.rememberAsyncImagePainter
+import com.example.baseproject3_foodrecipe.utils.LocalImageStorage
+import com.example.baseproject3_foodrecipe.viewmodel.ImageUploadViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.RecipeViewModel
 import kotlinx.coroutines.launch
-import coil.compose.rememberAsyncImagePainter
-import com.example.baseproject3_foodrecipe.viewmodel.ImageUploadViewModel
-import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +47,13 @@ fun CreateRecipeScreen(
     val coroutineScope = rememberCoroutineScope()
     val isLoading by recipeViewModel.isLoading.collectAsState()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Image upload state
+    val isUploading by imageUploadViewModel.isLoading.collectAsState()
+    val uploadSuccess by imageUploadViewModel.isSuccess.collectAsState()
+    val uploadError by imageUploadViewModel.error.collectAsState()
+    val imagePath by imageUploadViewModel.imagePath.collectAsState()
 
     // Recipe form state
     var recipeName by remember { mutableStateOf("") }
@@ -61,16 +66,48 @@ fun CreateRecipeScreen(
     var ingredients by remember { mutableStateOf(listOf("")) }
     var instructions by remember { mutableStateOf(listOf("")) }
     var selectedCategories by remember { mutableStateOf(setOf<String>()) }
+    var youtubeVideoId by remember { mutableStateOf("") }
 
-    // Image upload state
+    // Nutrition values
+    var protein by remember { mutableStateOf("") }
+    var carbs by remember { mutableStateOf("") }
+    var fat by remember { mutableStateOf("") }
+    var cuisine by remember { mutableStateOf("") }
+
+    // Local image state
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-    val uploadState by imageUploadViewModel.uploadState.collectAsState()
+    var localBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    // Reset upload state when navigating to this screen
+    LaunchedEffect(Unit) {
+        imageUploadViewModel.reset()
+    }
+
+    // Update local bitmap when image path changes
+    LaunchedEffect(imagePath) {
+        if (imagePath.isNotEmpty()) {
+            localBitmap = LocalImageStorage.loadImage(context, imagePath)
+        }
+    }
+
+    // Show snackbar for upload status
+    LaunchedEffect(uploadSuccess, uploadError) {
+        if (uploadSuccess) {
+            snackbarHostState.showSnackbar("Image uploaded successfully")
+            imageUploadViewModel.reset()
+        } else if (uploadError != null) {
+            snackbarHostState.showSnackbar("Error: $uploadError")
+            imageUploadViewModel.reset()
+        }
+    }
 
     // Image picker launcher
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        imageUri = uri
+        uri?.let {
+            imageUri = it
+        }
     }
 
     // Difficulty options
@@ -87,55 +124,10 @@ fun CreateRecipeScreen(
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                },
-                actions = {
-                    TextButton(
-                        onClick = {
-                            coroutineScope.launch {
-                                // First upload the image if selected
-                                var imageUrl = ""
-                                if (imageUri != null) {
-                                    imageUploadViewModel.uploadImage(imageUri!!, "recipes/${userId}_${System.currentTimeMillis()}")
-                                    // Wait for upload to complete and ensure we have the URL
-                                    while (uploadState.isLoading) {
-                                        // Wait for upload to complete
-                                        delay(100)
-                                    }
-                                    if (uploadState.isSuccess) {
-                                        imageUrl = uploadState.downloadUrl ?: ""
-                                    }
-                                }
-
-                                // Then create the recipe
-                                recipeViewModel.createRecipe(
-                                    name = recipeName,
-                                    description = description,
-                                    imageUrl = imageUrl,
-                                    authorId = userId,
-                                    authorName = userName,
-                                    prepTime = prepTime.toIntOrNull() ?: 0,
-                                    cookTime = cookTime.toIntOrNull() ?: 0,
-                                    servings = servings.toIntOrNull() ?: 0,
-                                    difficulty = difficulty,
-                                    ingredients = ingredients.filter { it.isNotBlank() },
-                                    instructions = instructions.filter { it.isNotBlank() },
-                                    categories = selectedCategories.toList(),
-                                    calories = calories.toIntOrNull() ?: 0
-                                )
-
-                                // Navigate back
-                                navController.popBackStack()
-                            }
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text("Save")
-                    }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -160,8 +152,19 @@ fun CreateRecipeScreen(
                         .clickable { imagePicker.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (imageUri != null) {
-                        // Display selected image
+                    if (isUploading) {
+                        // Show loading indicator
+                        CircularProgressIndicator()
+                    } else if (localBitmap != null) {
+                        // Show local bitmap
+                        Image(
+                            bitmap = localBitmap!!.asImageBitmap(),
+                            contentDescription = "Recipe Image",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else if (imageUri != null) {
+                        // Show selected image
                         Image(
                             painter = rememberAsyncImagePainter(imageUri),
                             contentDescription = "Recipe Image",
@@ -169,7 +172,7 @@ fun CreateRecipeScreen(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        // Display placeholder
+                        // Show placeholder
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
@@ -347,6 +350,88 @@ fun CreateRecipeScreen(
                     trailingIcon = { Text("kcal") }
                 )
 
+                // Nutritional Information
+                Text(
+                    text = "Nutritional Information",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Protein",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                        OutlinedTextField(
+                            value = protein,
+                            onValueChange = { protein = it },
+                            placeholder = { Text("20") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            trailingIcon = { Text("g") }
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Carbs",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                        OutlinedTextField(
+                            value = carbs,
+                            onValueChange = { carbs = it },
+                            placeholder = { Text("30") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            trailingIcon = { Text("g") }
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Fat",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Medium
+                            )
+                        )
+                        OutlinedTextField(
+                            value = fat,
+                            onValueChange = { fat = it },
+                            placeholder = { Text("15") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            trailingIcon = { Text("g") }
+                        )
+                    }
+                }
+
+                // Cuisine
+                Text(
+                    text = "Cuisine",
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+                OutlinedTextField(
+                    value = cuisine,
+                    onValueChange = { cuisine = it },
+                    placeholder = { Text("Italian") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
                 // Ingredients
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -483,10 +568,10 @@ fun CreateRecipeScreen(
                     )
                 )
 
-                FlowRow(
+                // Use a simple Row with wrapping for categories
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     categoryOptions.forEach { category ->
                         val isSelected = selectedCategories.contains(category)
@@ -514,41 +599,96 @@ fun CreateRecipeScreen(
                     }
                 }
 
+                // YouTube Video ID Field
+                OutlinedTextField(
+                    value = youtubeVideoId,
+                    onValueChange = { youtubeVideoId = it },
+                    label = { Text("YouTube Video ID or URL") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    singleLine = true
+                )
+
+                // Helper text for YouTube video
+                Text(
+                    text = "Enter a YouTube video ID or full URL",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Create Recipe Button
                 Button(
                     onClick = {
-                        coroutineScope.launch {
-                            // First upload the image if selected
-                            var imageUrl = ""
-                            if (imageUri != null) {
-                                imageUploadViewModel.uploadImage(imageUri!!, "recipes/${userId}_${System.currentTimeMillis()}")
-                                // Wait for upload to complete and ensure we have the URL
-                                while (uploadState.isLoading) {
-                                    // Wait for upload to complete
-                                    delay(100)
-                                }
-                                if (uploadState.isSuccess) {
-                                    imageUrl = uploadState.downloadUrl ?: ""
-                                }
+                        if (recipeName.isBlank()) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar("Recipe name cannot be empty")
                             }
+                            return@Button
+                        }
 
-                            recipeViewModel.createRecipe(
-                                name = recipeName,
-                                description = description,
-                                imageUrl = imageUrl,
-                                authorId = userId,
-                                authorName = userName,
-                                prepTime = prepTime.toIntOrNull() ?: 0,
-                                cookTime = cookTime.toIntOrNull() ?: 0,
-                                servings = servings.toIntOrNull() ?: 0,
-                                difficulty = difficulty,
-                                ingredients = ingredients.filter { it.isNotBlank() },
-                                instructions = instructions.filter { it.isNotBlank() },
-                                categories = selectedCategories.toList(),
-                                calories = calories.toIntOrNull() ?: 0
-                            )
+                        coroutineScope.launch {
+                            // Extract YouTube video ID if a full URL was provided
+                            val extractedVideoId =
+                                if (youtubeVideoId.contains("youtube.com") || youtubeVideoId.contains("youtu.be")) {
+                                    try {
+                                        val youTubeApiService = YouTubeApiService()
+                                        youTubeApiService.extractVideoIdFromUrl(youtubeVideoId)
+                                    } catch (e: Exception) {
+                                        youtubeVideoId
+                                    }
+                                } else {
+                                    youtubeVideoId
+                                }
+
+                            if (imageUri != null) {
+                                // If we have an image, save it and create recipe
+                                recipeViewModel.saveImageAndCreateRecipe(
+                                    context = context,
+                                    imageUri = imageUri!!,
+                                    name = recipeName,
+                                    description = description,
+                                    ingredients = ingredients.filter { it.isNotBlank() },
+                                    instructions = instructions.filter { it.isNotBlank() },
+                                    prepTime = prepTime.toIntOrNull() ?: 0,
+                                    cookTime = cookTime.toIntOrNull() ?: 0,
+                                    servings = servings.toIntOrNull() ?: 0,
+                                    difficulty = difficulty,
+                                    categories = selectedCategories.toList(),
+                                    authorId = userId,
+                                    authorName = userName,
+                                    calories = calories.toIntOrNull() ?: 0,
+//                                    protein = protein.toIntOrNull() ?: 0,
+//                                    carbs = carbs.toIntOrNull() ?: 0,
+//                                    fat = fat.toIntOrNull() ?: 0,
+//                                    cuisine = cuisine,
+                                    youtubeVideoId = extractedVideoId
+                                )
+                            } else {
+                                // Create recipe without image
+                                recipeViewModel.createRecipe(
+                                    name = recipeName,
+                                    description = description,
+                                    ingredients = ingredients.filter { it.isNotBlank() },
+                                    instructions = instructions.filter { it.isNotBlank() },
+                                    prepTime = prepTime.toIntOrNull() ?: 0,
+                                    cookTime = cookTime.toIntOrNull() ?: 0,
+                                    servings = servings.toIntOrNull() ?: 0,
+                                    difficulty = difficulty,
+                                    categories = selectedCategories.toList(),
+                                    authorId = userId,
+                                    authorName = userName,
+                                    calories = calories.toIntOrNull() ?: 0,
+//                                    protein = protein.toIntOrNull() ?: 0,
+//                                    carbs = carbs.toIntOrNull() ?: 0,
+//                                    fat = fat.toIntOrNull() ?: 0,
+//                                    cuisine = cuisine,
+                                    youtubeVideoId = extractedVideoId
+                                )
+                            }
 
                             // Navigate back
                             navController.popBackStack()
@@ -578,88 +718,18 @@ fun CreateRecipeScreen(
     }
 }
 
-@Composable
-fun FlowRow(
-    modifier: Modifier = Modifier,
-    horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
-    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
-    content: @Composable () -> Unit
-) {
-    Layout(
-        content = content,
-        modifier = modifier
-    ) { measurables, constraints ->
-        val horizontalGapPx = 0
-        val verticalGapPx = 0
-
-        val rows = mutableListOf<MeasuredRow>()
-        var rowConstraints = constraints
-        var rowPlaceables = mutableListOf<Placeable>()
-        var rowWidth = 0
-        var rowHeight = 0
-
-        measurables.forEach { measurable ->
-            val placeable = measurable.measure(rowConstraints)
-
-            if (rowWidth + placeable.width > constraints.maxWidth) {
-                rows.add(
-                    MeasuredRow(
-                        placeables = rowPlaceables,
-                        width = rowWidth - horizontalGapPx,
-                        height = rowHeight
-                    )
-                )
-
-                rowPlaceables = mutableListOf()
-                rowWidth = 0
-                rowHeight = 0
+class YouTubeApiService {
+    fun extractVideoIdFromUrl(url: String): String {
+        val videoId = when {
+            url.contains("youtube.com") -> {
+                val regex = "(?:v=)([^&]+)".toRegex()
+                regex.find(url)?.groupValues?.get(1) ?: ""
             }
-
-            rowPlaceables.add(placeable)
-            rowWidth += placeable.width + horizontalGapPx
-            rowHeight = maxOf(rowHeight, placeable.height)
-        }
-
-        if (rowPlaceables.isNotEmpty()) {
-            rows.add(
-                MeasuredRow(
-                    placeables = rowPlaceables,
-                    width = rowWidth - horizontalGapPx,
-                    height = rowHeight
-                )
-            )
-        }
-
-        val width = rows.maxOfOrNull { row -> row.width } ?: 0
-        val height = rows.sumBy { row -> row.height } + (rows.size - 1) * verticalGapPx
-
-        layout(width, height) {
-            var y = 0
-
-            rows.forEach { row ->
-                var x = when (horizontalArrangement) {
-                    Arrangement.Start -> 0
-                    Arrangement.Center -> (width - row.width) / 2
-                    Arrangement.End -> width - row.width
-                    Arrangement.SpaceBetween -> 0
-                    Arrangement.SpaceAround -> 0
-                    Arrangement.SpaceEvenly -> 0
-                    else -> 0
-                }
-
-                row.placeables.forEach { placeable ->
-                    placeable.place(x, y)
-                    x += placeable.width + horizontalGapPx
-                }
-
-                y += row.height + verticalGapPx
+            url.contains("youtu.be") -> {
+                url.substringAfterLast("/")
             }
+            else -> url
         }
+        return videoId
     }
 }
-
-data class MeasuredRow(
-    val placeables: List<Placeable>,
-    val width: Int,
-    val height: Int
-)

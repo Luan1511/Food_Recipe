@@ -1,56 +1,84 @@
 package com.example.baseproject3_foodrecipe.viewmodel
 
+import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.storage.FirebaseStorage
+import com.example.baseproject3_foodrecipe.model.ImageRepository
+import com.example.baseproject3_foodrecipe.utils.LocalImageStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
-data class UploadState(
-    val isLoading: Boolean = false,
-    val isSuccess: Boolean = false,
-    val isError: Boolean = false,
-    val errorMessage: String? = null,
-    val downloadUrl: String? = null
-)
-
+/**
+ * ViewModel for handling image uploads
+ */
 class ImageUploadViewModel : ViewModel() {
-    private val storage = FirebaseStorage.getInstance()
+    private val imageRepository = ImageRepository()
 
-    private val _uploadState = MutableStateFlow(UploadState())
-    val uploadState: StateFlow<UploadState> = _uploadState.asStateFlow()
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    fun uploadImage(imageUri: Uri, path: String) {
+    private val _isSuccess = MutableStateFlow(false)
+    val isSuccess: StateFlow<Boolean> = _isSuccess.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _imagePath = MutableStateFlow("")
+    val imagePath: StateFlow<String> = _imagePath.asStateFlow()
+
+    private val TAG = "ImageUploadViewModel"
+
+    /**
+     * Upload an image from a URI to Firebase Storage
+     */
+    fun uploadImage(context: Context, uri: Uri, folder: String) {
+        _isLoading.value = true
+        _isSuccess.value = false
+        _error.value = null
+
         viewModelScope.launch {
             try {
-                _uploadState.value = UploadState(isLoading = true)
+                // First save to local storage
+                Log.d(TAG, "Saving image to local storage")
+                val localPath = LocalImageStorage.saveImage(context, uri, folder)
+                Log.d(TAG, "Local path: $localPath")
 
-                val storageRef = storage.reference.child(path)
-                storageRef.putFile(imageUri).await()
+                // In a real app, upload to Firebase Storage and get URL
+                // val remoteUrl = imageRepository.uploadImageToFirebase(localPath)
 
-                // Get download URL
-                val downloadUrl = storageRef.downloadUrl.await().toString()
-
-                _uploadState.value = UploadState(
-                    isLoading = false,
-                    isSuccess = true,
-                    downloadUrl = downloadUrl
-                )
+                // For now, just use the local path
+                _imagePath.value = localPath
+                _isSuccess.value = true
+                _error.value = null
             } catch (e: Exception) {
-                _uploadState.value = UploadState(
-                    isLoading = false,
-                    isError = true,
-                    errorMessage = e.message
-                )
+                Log.e(TAG, "Error uploading image: ${e.message}", e)
+                _error.value = e.message
+                _isSuccess.value = false
+            } finally {
+                _isLoading.value = false
             }
         }
     }
 
-    fun resetUploadState() {
-        _uploadState.value = UploadState()
+    /**
+     * Set the image path directly (used when an image is already saved)
+     */
+    fun setImagePath(path: String) {
+        _imagePath.value = path
+        _isSuccess.value = true
+    }
+
+    /**
+     * Reset the state
+     */
+    fun reset() {
+        _isLoading.value = false
+        _isSuccess.value = false
+        _error.value = null
+        // Don't reset the image path, as it might be needed later
     }
 }

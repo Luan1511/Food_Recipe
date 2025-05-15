@@ -165,11 +165,8 @@ fun MyRecipesScreen(
             ) {
                 items(userRecipes) { recipe ->
                     Box {
-                        RecipeCard(
-                            title = recipe.name,
-                            cookingTime = "${recipe.totalTime} min",
-                            difficulty = recipe.difficulty,
-                            imageRes = R.drawable.italian_pasta, // Replace with actual image
+                        RecipeCardFromModel(
+                            recipe = recipe,
                             onClick = { navController.navigate("recipe_detail/${recipe.id}") }
                         )
 

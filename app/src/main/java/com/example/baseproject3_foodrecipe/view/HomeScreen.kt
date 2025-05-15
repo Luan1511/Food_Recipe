@@ -33,6 +33,7 @@ import com.example.baseproject3_foodrecipe.ui.theme.*
 import com.example.baseproject3_foodrecipe.viewmodel.AuthViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.RecipeViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.UserViewModel
+import com.example.baseproject3_foodrecipe.viewmodel.SearchViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,8 +43,7 @@ fun HomeScreen(
     userViewModel: UserViewModel = viewModel(),
     authViewModel: AuthViewModel = viewModel()
 ) {
-    val featuredRecipes by recipeViewModel.featuredRecipes.collectAsState()
-    val popularRecipes by recipeViewModel.popularRecipes.collectAsState()
+    val recipes by recipeViewModel.recipes.collectAsState(initial = emptyList())
     val isLoading by recipeViewModel.isLoading.collectAsState()
     val currentUser by userViewModel.currentUser.collectAsState()
     val firebaseUser by authViewModel.currentUser.collectAsState()
@@ -59,7 +59,7 @@ fun HomeScreen(
 
     // Load recipes if empty
     LaunchedEffect(Unit) {
-        if (featuredRecipes.isEmpty()) {
+        if (recipes.isEmpty()) {
             recipeViewModel.loadAllRecipes()
         }
     }
@@ -92,18 +92,28 @@ fun HomeScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "CookLive",
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Bold
-                        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 16.dp)
+        ) {
+            // App Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Cookii",
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold
                     )
-                },
-                actions = {
+                )
+
+                Row {
                     IconButton(onClick = { navController.navigate("search") }) {
                         Icon(Icons.Default.Search, contentDescription = "Tìm kiếm")
                     }
@@ -113,73 +123,38 @@ fun HomeScreen(
                     IconButton(onClick = { showLogoutDialog.value = true }) {
                         Icon(Icons.Default.ExitToApp, contentDescription = "Đăng xuất")
                     }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { /* TODO: Menu action */ }) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu")
-                    }
                 }
-            )
-        },
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    icon = { Icon(painterResource(id = R.drawable.ic_home), contentDescription = "Trang chủ") },
-                    label = { Text("Trang chủ") },
-                    selected = true,
-                    onClick = { /* Already on home */ }
-                )
-                NavigationBarItem(
-                    icon = { Icon(painterResource(id = R.drawable.ic_video), contentDescription = "Video") },
-                    label = { Text("Video") },
-                    selected = false,
-                    onClick = { /* TODO: Navigate to videos */ }
-                )
-                NavigationBarItem(
-                    icon = { Icon(painterResource(id = R.drawable.ic_saved), contentDescription = "Đã lưu") },
-                    label = { Text("Đã lưu") },
-                    selected = false,
-                    onClick = { navController.navigate("saved_recipes") }
-                )
-                NavigationBarItem(
-                    icon = { Icon(painterResource(id = R.drawable.ic_profile), contentDescription = "Hồ sơ") },
-                    label = { Text("Hồ sơ") },
-                    selected = false,
-                    onClick = {
-                        firebaseUser?.uid?.let { userId ->
-                            navController.navigate("profile/$userId")
-                        }
-                    }
-                )
             }
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    firebaseUser?.let { user ->
-                        navController.navigate("create_recipe/${user.uid}/${user.displayName}")
-                    }
+
+            // Content
+            if (isLoading && recipes.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
                 }
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Tạo công thức")
+            } else {
+                HomeContent(
+                    modifier = Modifier.weight(1f),
+                    navController = navController,
+                    featuredRecipes = recipes.filter { it.isFeatured },
+                    popularRecipes = recipes.sortedByDescending { it.rating }.take(10)
+                )
             }
         }
-    ) { paddingValues ->
-        if (isLoading && featuredRecipes.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            HomeContent(
-                modifier = Modifier.padding(paddingValues),
-                navController = navController,
-                featuredRecipes = featuredRecipes,
-                popularRecipes = popularRecipes
+
+        // Camera FAB for food recognition
+        FloatingActionButton(
+            onClick = { navController.navigate("food_recognition") },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        ) {
+            Icon(
+                imageVector = Icons.Default.CameraAlt,
+                contentDescription = "Nhận diện thực phẩm"
             )
         }
     }

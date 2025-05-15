@@ -1,277 +1,326 @@
 package com.example.baseproject3_foodrecipe.model
 
-import android.util.Log
-import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.tasks.await
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
+/**
+ * Repository for managing users
+ */
 class UserRepository {
-    private val db = FirebaseFirestore.getInstance()
-    private val usersCollection = db.collection("users")
-    private val followsCollection = db.collection("follows")
+    private val auth = FirebaseAuth.getInstance()
 
-    suspend fun getUser(userId: String): User? {
-        return try {
-            withContext(Dispatchers.IO) {
-                val document = usersCollection.document(userId).get().await()
-                document.toObject(User::class.java)
-            }
-        } catch (e: Exception) {
-            Log.e("UserRepository", "Error getting user: ${e.message}")
-            null
+    // In-memory storage for users (replace with database in production)
+    private val users = mutableListOf<User>()
+
+    // In-memory storage for user-recipe relationships
+    private val userRecipes = mutableMapOf<String, MutableList<Recipe>>() // userId -> List<Recipe>
+
+    init {
+        // Add some sample users for testing
+        if (users.isEmpty()) {
+            users.add(
+                User(
+                    id = "sample_user_1",
+                    name = "John Doe",
+                    email = "john@example.com",
+                    bio = "Food enthusiast and home chef",
+                    profileImageUrl = "",
+                    followers = listOf("sample_user_2"),
+                    following = listOf("sample_user_3"),
+                    isAdmin = false,
+                    isChef = true,
+                    chefTitle = "Home Chef"
+                )
+            )
+            users.add(
+                User(
+                    id = "sample_user_2",
+                    name = "Jane Smith",
+                    email = "jane@example.com",
+                    bio = "Professional pastry chef",
+                    profileImageUrl = "",
+                    followers = listOf("sample_user_1"),
+                    following = listOf(),
+                    isAdmin = false,
+                    isChef = true,
+                    chefTitle = "Pastry Chef"
+                )
+            )
+            users.add(
+                User(
+                    id = "sample_user_3",
+                    name = "Admin User",
+                    email = "admin@example.com",
+                    bio = "Site administrator",
+                    profileImageUrl = "",
+                    followers = listOf(),
+                    following = listOf(),
+                    isAdmin = true,
+                    isChef = false,
+                    chefTitle = ""
+                )
+            )
         }
     }
 
-    suspend fun getUserByEmail(email: String): User? {
-        return try {
-            withContext(Dispatchers.IO) {
-                val snapshot = usersCollection
-                    .whereEqualTo("email", email)
-                    .limit(1)
-                    .get()
-                    .await()
+    /**
+     * Get the current logged-in user
+     */
+    fun getCurrentUser(): User? {
+        val firebaseUser = auth.currentUser ?: return null
 
-                if (snapshot.documents.isNotEmpty()) {
-                    snapshot.documents[0].toObject(User::class.java)
-                } else {
-                    null
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("UserRepository", "Error getting user by email: ${e.message}")
-            null
+        // First check if user exists in our local cache
+        var user = users.find { it.id == firebaseUser.uid }
+
+        // If not found, create a new user object from Firebase user
+        if (user == null) {
+            user = User(
+                id = firebaseUser.uid,
+                name = firebaseUser.displayName ?: "User",
+                email = firebaseUser.email ?: "",
+                profileImageUrl = firebaseUser.photoUrl?.toString() ?: "",
+                bio = "",
+                followers = emptyList(),
+                following = emptyList(),
+                isAdmin = false,
+                isChef = false
+            )
+
+            // Add to our local cache
+            users.add(user)
         }
+
+        return user
     }
 
-    suspend fun createUser(user: User): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                usersCollection.document(user.id).set(user).await()
-                true
-            }
-        } catch (e: Exception) {
-            Log.e("UserRepository", "Error creating user: ${e.message}")
-            false
+    /**
+     * Get a user by ID
+     */
+    suspend fun getUser(userId: String): User? = withContext(Dispatchers.IO) {
+        // First check if this is the current Firebase user
+        val firebaseUser = auth.currentUser
+        if (firebaseUser != null && firebaseUser.uid == userId) {
+            // Return current user or create if not in cache
+            return@withContext getCurrentUser()
         }
-    }
 
-    suspend fun updateUser(user: User): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                usersCollection.document(user.id).set(user).await()
-                true
-            }
-        } catch (e: Exception) {
-            Log.e("UserRepository", "Error updating user: ${e.message}")
-            false
-        }
-    }
+        // Otherwise check our local cache
+        var user = users.find { it.id == userId }
 
-    suspend fun deleteUser(userId: String): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                usersCollection.document(userId).delete().await()
-                true
-            }
-        } catch (e: Exception) {
-            Log.e("UserRepository", "Error deleting user: ${e.message}")
-            false
-        }
-    }
-
-    suspend fun addRecipeToUser(userId: String, recipeId: String): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                val user = getUser(userId)
-                if (user != null) {
-                    val updatedRecipes = user.recipes.toMutableList()
-                    if (!updatedRecipes.contains(recipeId)) {
-                        updatedRecipes.add(recipeId)
-                        usersCollection.document(userId)
-                            .update("recipes", updatedRecipes)
-                            .await()
-                        true
-                    } else {
-                        // Recipe already in user's list
-                        true
-                    }
-                } else {
-                    false
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("UserRepository", "Error adding recipe to user: ${e.message}")
-            false
-        }
-    }
-
-    suspend fun saveRecipe(userId: String, recipeId: String): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                val user = getUser(userId)
-                if (user != null) {
-                    val savedRecipes = user.savedRecipes.toMutableList()
-                    if (!savedRecipes.contains(recipeId)) {
-                        savedRecipes.add(recipeId)
-                        usersCollection.document(userId)
-                            .update("savedRecipes", savedRecipes)
-                            .await()
-                        true
-                    } else {
-                        // Recipe already saved
-                        true
-                    }
-                } else {
-                    false
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("UserRepository", "Error saving recipe: ${e.message}")
-            false
-        }
-    }
-
-    suspend fun unsaveRecipe(userId: String, recipeId: String): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                val user = getUser(userId)
-                if (user != null) {
-                    val savedRecipes = user.savedRecipes.toMutableList()
-                    if (savedRecipes.contains(recipeId)) {
-                        savedRecipes.remove(recipeId)
-                        usersCollection.document(userId)
-                            .update("savedRecipes", savedRecipes)
-                            .await()
-                        true
-                    } else {
-                        // Recipe not in saved list
-                        true
-                    }
-                } else {
-                    false
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("UserRepository", "Error unsaving recipe: ${e.message}")
-            false
-        }
-    }
-
-    suspend fun isFollowingUser(currentUserId: String, targetUserId: String): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                val followDoc = followsCollection
-                    .whereEqualTo("followerId", currentUserId)
-                    .whereEqualTo("followingId", targetUserId)
-                    .get()
-                    .await()
-
-                !followDoc.isEmpty
-            }
-        } catch (e: Exception) {
-            Log.e("UserRepository", "Error checking follow status: ${e.message}")
-            false
-        }
-    }
-
-    suspend fun followUser(currentUserId: String, targetUserId: String): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                // Check if already following
-                if (isFollowingUser(currentUserId, targetUserId)) {
-                    return@withContext true
-                }
-
-                // Create follow relationship
-                val followId = "${currentUserId}_${targetUserId}"
-                val followData = hashMapOf(
-                    "id" to followId,
-                    "followerId" to currentUserId,
-                    "followingId" to targetUserId,
-                    "timestamp" to System.currentTimeMillis()
+        // If not found and this is a valid Firebase user ID, try to get from Firebase
+        if (user == null) {
+            try {
+                // Create a default user with this ID if we can't find it
+                // In a real app, you would fetch from Firestore/database
+                user = User(
+                    id = userId,
+                    name = "User $userId",
+                    email = "user$userId@example.com",
+                    bio = "No bio available",
+                    profileImageUrl = "",
+                    followers = emptyList(),
+                    following = emptyList()
                 )
 
-                followsCollection.document(followId).set(followData).await()
-
-                // Update current user's following count
-                val currentUser = getUser(currentUserId)
-                if (currentUser != null) {
-                    usersCollection.document(currentUserId)
-                        .update("following", currentUser.following + 1)
-                        .await()
-                }
-
-                // Update target user's followers count
-                val targetUser = getUser(targetUserId)
-                if (targetUser != null) {
-                    usersCollection.document(targetUserId)
-                        .update("followers", targetUser.followers + 1)
-                        .await()
-                }
-
-                true
+                // Add to our local cache
+                users.add(user)
+            } catch (e: Exception) {
+                println("Error getting user: ${e.message}")
+                return@withContext null
             }
+        }
+
+        return@withContext user
+    }
+
+    /**
+     * Get all users
+     */
+    suspend fun getAllUsers(): List<User> = withContext(Dispatchers.IO) {
+        return@withContext users.toList()
+    }
+
+    /**
+     * Search users by name or email
+     */
+    suspend fun searchUsers(query: String): List<User> = withContext(Dispatchers.IO) {
+        if (query.isBlank()) {
+            return@withContext emptyList()
+        }
+
+        return@withContext users.filter { user ->
+            user.name.contains(query, ignoreCase = true) ||
+                    user.email.contains(query, ignoreCase = true)
+        }
+    }
+
+    /**
+     * Create a new user
+     */
+    suspend fun createUser(user: User): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // Check if user with same email already exists
+            if (users.any { it.email == user.email }) {
+                return@withContext false
+            }
+
+            users.add(user)
+            true
         } catch (e: Exception) {
-            Log.e("UserRepository", "Error following user: ${e.message}")
             false
         }
     }
 
-    suspend fun unfollowUser(currentUserId: String, targetUserId: String): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                // Check if actually following
-                if (!isFollowingUser(currentUserId, targetUserId)) {
-                    return@withContext true
-                }
-
-                // Delete follow relationship
-                val followId = "${currentUserId}_${targetUserId}"
-                followsCollection.document(followId).delete().await()
-
-                // Update current user's following count
-                val currentUser = getUser(currentUserId)
-                if (currentUser != null && currentUser.following > 0) {
-                    usersCollection.document(currentUserId)
-                        .update("following", currentUser.following - 1)
-                        .await()
-                }
-
-                // Update target user's followers count
-                val targetUser = getUser(targetUserId)
-                if (targetUser != null && targetUser.followers > 0) {
-                    usersCollection.document(targetUserId)
-                        .update("followers", targetUser.followers - 1)
-                        .await()
-                }
-
+    /**
+     * Update an existing user
+     */
+    suspend fun updateUser(user: User): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val index = users.indexOfFirst { it.id == user.id }
+            if (index >= 0) {
+                users[index] = user
                 true
+            } else {
+                false
             }
         } catch (e: Exception) {
-            Log.e("UserRepository", "Error unfollowing user: ${e.message}")
             false
         }
     }
 
-    suspend fun searchUsers(query: String): List<User> {
-        return try {
-            withContext(Dispatchers.IO) {
-                // Get all users and filter locally
-                // In a real app, you'd use Firestore's search capabilities
-                val snapshot = usersCollection.get().await()
-                val allUsers = snapshot.documents.mapNotNull { it.toObject(User::class.java) }
+    /**
+     * Follow a user
+     */
+    suspend fun followUser(currentUserId: String, targetUserId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val currentUserIndex = users.indexOfFirst { it.id == currentUserId }
+            val targetUserIndex = users.indexOfFirst { it.id == targetUserId }
 
-                allUsers.filter { user ->
-                    user.name.contains(query, ignoreCase = true) ||
-                            user.username.contains(query, ignoreCase = true) ||
-                            user.email.contains(query, ignoreCase = true) ||
-                            user.bio.contains(query, ignoreCase = true)
+            if (currentUserIndex >= 0 && targetUserIndex >= 0) {
+                // Update current user's following list
+                val currentUser = users[currentUserIndex]
+                val updatedFollowing = ArrayList<String>(currentUser.following)
+                if (!updatedFollowing.contains(targetUserId)) {
+                    updatedFollowing.add(targetUserId)
                 }
+                users[currentUserIndex] = currentUser.copy(following = updatedFollowing)
+
+                // Update target user's followers list
+                val targetUser = users[targetUserIndex]
+                val updatedFollowers = ArrayList<String>(targetUser.followers)
+                if (!updatedFollowers.contains(currentUserId)) {
+                    updatedFollowers.add(currentUserId)
+                }
+                users[targetUserIndex] = targetUser.copy(followers = updatedFollowers)
+
+                true
+            } else {
+                false
             }
         } catch (e: Exception) {
-            Log.e("UserRepository", "Error searching users: ${e.message}")
-            emptyList()
+            false
+        }
+    }
+
+    /**
+     * Unfollow a user
+     */
+    suspend fun unfollowUser(currentUserId: String, targetUserId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val currentUserIndex = users.indexOfFirst { it.id == currentUserId }
+            val targetUserIndex = users.indexOfFirst { it.id == targetUserId }
+
+            if (currentUserIndex >= 0 && targetUserIndex >= 0) {
+                // Update current user's following list
+                val currentUser = users[currentUserIndex]
+                val updatedFollowing = ArrayList<String>(currentUser.following)
+                updatedFollowing.remove(targetUserId)
+                users[currentUserIndex] = currentUser.copy(following = updatedFollowing)
+
+                // Update target user's followers list
+                val targetUser = users[targetUserIndex]
+                val updatedFollowers = ArrayList<String>(targetUser.followers)
+                updatedFollowers.remove(currentUserId)
+                users[targetUserIndex] = targetUser.copy(followers = updatedFollowers)
+
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Check if a user is following another user
+     */
+    suspend fun isFollowingUser(currentUserId: String, targetUserId: String): Boolean = withContext(Dispatchers.IO) {
+        val currentUser = users.find { it.id == currentUserId }
+        return@withContext currentUser?.following?.contains(targetUserId) ?: false
+    }
+
+    /**
+     * Set admin status for a user
+     */
+    suspend fun setAdminStatus(userId: String, isAdmin: Boolean): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val index = users.indexOfFirst { it.id == userId }
+            if (index >= 0) {
+                val user = users[index]
+                users[index] = user.copy(isAdmin = isAdmin)
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Set chef status for a user
+     */
+    suspend fun setChefStatus(userId: String, isChef: Boolean, chefTitle: String = ""): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val index = users.indexOfFirst { it.id == userId }
+            if (index >= 0) {
+                val user = users[index]
+                users[index] = user.copy(
+                    isChef = isChef,
+                    chefTitle = if (isChef) chefTitle else ""
+                )
+                true
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Get recipes created by a specific user
+     */
+    suspend fun getRecipesByAuthor(authorId: String): List<Recipe> = withContext(Dispatchers.IO) {
+        return@withContext userRecipes[authorId]?.toList() ?: emptyList()
+    }
+
+    /**
+     * Add a recipe to a user's recipes
+     */
+    suspend fun addRecipeToUser(userId: String, recipe: Recipe): Boolean = withContext(Dispatchers.IO) {
+        try {
+            if (!userRecipes.containsKey(userId)) {
+                userRecipes[userId] = mutableListOf()
+            }
+
+            userRecipes[userId]?.add(recipe)
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 }

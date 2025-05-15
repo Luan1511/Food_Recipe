@@ -1,0 +1,6 @@
+carrot
+potato
+tomato
+chicken
+fish
+pork

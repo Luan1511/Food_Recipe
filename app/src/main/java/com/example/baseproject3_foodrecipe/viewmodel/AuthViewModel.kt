@@ -1,5 +1,6 @@
 package com.example.baseproject3_foodrecipe.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.baseproject3_foodrecipe.model.AuthRepository
@@ -30,6 +31,9 @@ class AuthViewModel : ViewModel() {
     private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
+    private val _isAdmin = MutableStateFlow(false)
+    val isAdmin: StateFlow<Boolean> = _isAdmin.asStateFlow()
+
     init {
         // Kiểm tra trạng thái đăng nhập khi khởi tạo
         checkAuthState()
@@ -51,6 +55,7 @@ class AuthViewModel : ViewModel() {
             try {
                 val user = userRepository.getUser(userId)
                 _userProfile.value = user
+                _isAdmin.value = user?.isAdmin ?: false
                 _errorMessage.value = null
             } catch (e: Exception) {
                 _errorMessage.value = "Không thể tải thông tin người dùng: ${e.message}"
@@ -66,20 +71,19 @@ class AuthViewModel : ViewModel() {
             _errorMessage.value = null
 
             try {
-                val result = authRepository.registerUser(email, password, name, isChef)
+                val firebaseUser = authRepository.registerUser(email, password, name, isChef)
 
-                if (result.isSuccess) {
-                    _currentUser.value = result.getOrNull()
+                if (firebaseUser != null) {
+                    _currentUser.value = firebaseUser
                     _isLoggedIn.value = true
 
                     // Tải thông tin người dùng
-                    result.getOrNull()?.let { user ->
-                        loadUserProfile(user.uid)
-                    }
+                    loadUserProfile(firebaseUser.uid)
                 } else {
-                    _errorMessage.value = result.exceptionOrNull()?.message ?: "Đăng ký thất bại"
+                    _errorMessage.value = "Đăng ký thất bại"
                 }
             } catch (e: Exception) {
+                Log.e("AuthViewModel", "Đăng ký thất bại", e)
                 _errorMessage.value = "Đăng ký thất bại: ${e.message}"
             } finally {
                 _isLoading.value = false
@@ -93,20 +97,19 @@ class AuthViewModel : ViewModel() {
             _errorMessage.value = null
 
             try {
-                val result = authRepository.loginUser(email, password)
+                val firebaseUser = authRepository.loginUser(email, password)
 
-                if (result.isSuccess) {
-                    _currentUser.value = result.getOrNull()
+                if (firebaseUser != null) {
+                    _currentUser.value = firebaseUser
                     _isLoggedIn.value = true
 
                     // Tải thông tin người dùng
-                    result.getOrNull()?.let { user ->
-                        loadUserProfile(user.uid)
-                    }
+                    loadUserProfile(firebaseUser.uid)
                 } else {
-                    _errorMessage.value = result.exceptionOrNull()?.message ?: "Đăng nhập thất bại"
+                    _errorMessage.value = "Đăng nhập thất bại"
                 }
             } catch (e: Exception) {
+                Log.e("AuthViewModel", "Đăng nhập thất bại", e)
                 _errorMessage.value = "Đăng nhập thất bại: ${e.message}"
             } finally {
                 _isLoading.value = false
@@ -119,6 +122,7 @@ class AuthViewModel : ViewModel() {
         _currentUser.value = null
         _userProfile.value = null
         _isLoggedIn.value = false
+        _isAdmin.value = false
     }
 
     fun sendPasswordResetEmail(email: String) {
@@ -127,10 +131,10 @@ class AuthViewModel : ViewModel() {
             _errorMessage.value = null
 
             try {
-                val result = authRepository.sendPasswordResetEmail(email)
+                val success = authRepository.sendPasswordResetEmail(email)
 
-                if (result.isFailure) {
-                    _errorMessage.value = result.exceptionOrNull()?.message ?: "Gửi email đặt lại mật khẩu thất bại"
+                if (!success) {
+                    _errorMessage.value = "Gửi email đặt lại mật khẩu thất bại"
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "Gửi email đặt lại mật khẩu thất bại: ${e.message}"
@@ -142,5 +146,10 @@ class AuthViewModel : ViewModel() {
 
     fun clearError() {
         _errorMessage.value = null
+    }
+
+    // Kiểm tra xem người dùng hiện tại có phải là admin không
+    fun isCurrentUserAdmin(): Boolean {
+        return _isAdmin.value
     }
 }

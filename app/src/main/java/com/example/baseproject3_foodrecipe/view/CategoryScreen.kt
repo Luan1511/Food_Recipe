@@ -15,29 +15,28 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.baseproject3_foodrecipe.R
+import com.example.baseproject3_foodrecipe.model.Recipe
 import com.example.baseproject3_foodrecipe.viewmodel.RecipeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryScreen(
     navController: NavController,
-    categoryName: String,
+    category: String,
     recipeViewModel: RecipeViewModel = viewModel()
 ) {
-    val recipesByCategory by recipeViewModel.recipesByCategory.collectAsState()
+    val recipes by recipeViewModel.categoryRecipes.collectAsState(initial = emptyList())
     val isLoading by recipeViewModel.isLoading.collectAsState()
 
     // Load recipes for this category
-    LaunchedEffect(categoryName) {
-        recipeViewModel.getRecipesByCategory(categoryName)
+    LaunchedEffect(category) {
+        recipeViewModel.getRecipesByCategory(category)
     }
-
-    val recipes = recipesByCategory[categoryName] ?: emptyList()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(categoryName) },
+                title = { Text(category) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -62,10 +61,25 @@ fun CategoryScreen(
                     .padding(paddingValues),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "No recipes found in this category",
-                    style = MaterialTheme.typography.bodyLarge
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "No Recipes Found",
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "There are no recipes in this category yet",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
             }
         } else {
             LazyVerticalGrid(
@@ -76,11 +90,8 @@ fun CategoryScreen(
                 modifier = Modifier.padding(paddingValues)
             ) {
                 items(recipes) { recipe ->
-                    RecipeCard(
-                        title = recipe.name,
-                        cookingTime = "${recipe.totalTime} min",
-                        difficulty = recipe.difficulty,
-                        imageRes = R.drawable.italian_pasta, // Replace with actual image
+                    RecipeCardFromModel(
+                        recipe = recipe,
                         onClick = { navController.navigate("recipe_detail/${recipe.id}") }
                     )
                 }

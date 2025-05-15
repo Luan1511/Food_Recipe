@@ -102,7 +102,7 @@ fun LoginScreen(
 
                 // Tiêu đề
                 Text(
-                    text = "CookLive",
+                    text = "Cookii",
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Bold,
                         color = md_food_primary

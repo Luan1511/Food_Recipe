@@ -213,7 +213,7 @@ fun RecipeSearchItem(
                 )
 
                 Text(
-                    text = "${recipe.totalTime} min",
+                    text = "${(recipe.prepTime + recipe.cookTime)} min",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.Gray
                 )
@@ -267,7 +267,7 @@ fun UserSearchItem(
                 color = Color.Gray
             )
 
-            if (user.chef) {
+            if (user.isChef) {
                 Text(
                     text = user.chefTitle,
                     style = MaterialTheme.typography.bodySmall,
