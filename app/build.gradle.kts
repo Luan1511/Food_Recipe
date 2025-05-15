@@ -56,6 +56,7 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
 }
 
 dependencies {
@@ -113,6 +114,12 @@ dependencies {
     implementation ("com.google.android.exoplayer:exoplayer-dash:2.18.7")
     implementation ("com.google.android.exoplayer:exoplayer-hls:2.18.7")
     implementation ("com.google.android.exoplayer:exoplayer-smoothstreaming:2.18.7")
+
+    // OkHttp for network requests
+    implementation("com.squareup.okhttp3:okhttp:4.10.0")
+
+    // JSON parsing
+    implementation("org.json:json:20230227")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

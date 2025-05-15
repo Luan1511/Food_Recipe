@@ -7,26 +7,8 @@ import com.google.firebase.firestore.PropertyName
  * Data class representing a recipe
  */
 data class Recipe(
-//    val id: String,
-//    val name: String,
-//    val description: String,
-//    val ingredients: List<String>,
-//    val instructions: List<String>,
-//    val prepTime: Int,
-//    val cookTime: Int,
-//    val servings: Int,
-//    val difficulty: String,
-//    val categories: List<String>,
-//    val authorId: String,
-//    val authorName: String,
-//    val imageUrl: String = "",
     val creationDate: Long = 0,
-//    val rating: Double = 0.0,
-//    val ratingCount: Int = 0,
-//    val reviewCount: Int = 0,
-//    val calories: Int = 0,
     val nutritionInfo: NutritionInfo? = null,
-//    val youtubeVideoId: String = "",
     val isFeatured: Boolean = false,
     val isPopular: Boolean = false,
 

@@ -11,7 +11,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Report
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,12 +29,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.baseproject3_foodrecipe.R
-import com.example.baseproject3_foodrecipe.model.BlogPost
 import com.example.baseproject3_foodrecipe.utils.LocalImageStorage
 import com.example.baseproject3_foodrecipe.viewmodel.AuthViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.BlogViewModel
@@ -53,11 +58,6 @@ fun ProfileScreen(
     val errorMessage by userViewModel.errorMessage.collectAsState()
     val currentAuthUser = authViewModel.currentUser.collectAsState().value
     val isCurrentUserProfile = currentAuthUser?.uid == userId
-    val isAdmin by authViewModel.isAdmin.collectAsState()
-
-    // State for follow button
-    var isFollowing by remember { mutableStateOf(false) }
-    var followButtonEnabled by remember { mutableStateOf(true) }
 
     // State for tab selection
     var selectedTab by remember { mutableStateOf(0) }
@@ -74,17 +74,13 @@ fun ProfileScreen(
     // Load user data
     LaunchedEffect(userId) {
         if (userId.isNotEmpty()) {
+            println("ProfileScreen: Loading data for user ID: $userId")
             userViewModel.getUserById(userId)
             userViewModel.loadUserRecipes(userId)
             blogViewModel.loadUserBlogs(userId)
+            println("ProfileScreen: userRecipes size: ${userViewModel.userRecipes.value.size}")
+            println("ProfileScreen: userBlogs size: ${blogViewModel.userBlogs.value.size}")
         }
-    }
-
-    // Debug: Print userId and currentAuthUser to console
-    LaunchedEffect(userId, currentAuthUser) {
-        println("ProfileScreen - userId: $userId")
-        println("ProfileScreen - currentAuthUser: ${currentAuthUser?.uid}")
-        println("ProfileScreen - isCurrentUserProfile: $isCurrentUserProfile")
     }
 
     // Load profile image
@@ -94,17 +90,9 @@ fun ProfileScreen(
                 try {
                     profileBitmap = LocalImageStorage.loadImage(context, user.profileImageUrl)
                 } catch (e: Exception) {
-                    // Handle error loading image
                     println("Error loading profile image: ${e.message}")
                 }
             }
-        }
-    }
-
-    // Check if current user is following this user
-    LaunchedEffect(currentUser, currentAuthUser) {
-        if (currentUser != null && currentAuthUser != null && !isCurrentUserProfile && userId.isNotEmpty()) {
-            isFollowing = userViewModel.isFollowingUser(currentAuthUser.uid, userId)
         }
     }
 
@@ -147,59 +135,46 @@ fun ProfileScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Hồ sơ") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    if (isCurrentUserProfile) {
-                        IconButton(onClick = { showLogoutDialog.value = true }) {
-                            Icon(Icons.Default.ExitToApp, contentDescription = "Đăng xuất")
-                        }
-                    }
-
-                    // Admin actions
-                    if (isAdmin) {
-                        IconButton(
-                            onClick = {
-                                // Navigate to admin panel
-                                navController.navigate("admin_panel")
-                            }
-                        ) {
-                            Icon(Icons.Default.AdminPanelSettings, contentDescription = "Admin Panel")
-                        }
-                    }
-                }
-            )
-        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
+            // Only show FAB if user is viewing their own profile
             if (isCurrentUserProfile) {
-                if (selectedTab == 0) {
-                    // Recipe FAB
-                    FloatingActionButton(
-                        onClick = {
-                            navController.navigate("create_recipe")
+                when (selectedTab) {
+                    0 -> {
+                        // FAB for creating a new recipe
+                        FloatingActionButton(
+                            onClick = {
+                                navController.navigate("create_recipe")
+                            },
+                            containerColor = Color(0xFFFF7043),
+                            contentColor = Color.White
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Create Recipe"
+                            )
                         }
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Create Recipe")
                     }
-                } else {
-                    // Blog FAB
-                    FloatingActionButton(
-                        onClick = {
-                            navController.navigate("create_blog/${currentAuthUser?.uid}/${currentAuthUser?.displayName ?: "User"}")
+                    1 -> {
+                        // FAB for creating a new blog
+                        FloatingActionButton(
+                            onClick = {
+                                currentAuthUser?.let { user ->
+                                    navController.navigate("create_blog/${user.uid}/${user.displayName ?: "User"}")
+                                }
+                            },
+                            containerColor = Color(0xFFFF7043),
+                            contentColor = Color.White
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Create Blog"
+                            )
                         }
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Create Blog")
                     }
                 }
             }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        }
     ) { paddingValues ->
         if (userId.isEmpty()) {
             Box(
@@ -230,8 +205,6 @@ fun ProfileScreen(
                     Text("Không tìm thấy thông tin người dùng")
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(onClick = {
-                        // Debug: Print more information
-                        println("Retrying getUserById with userId: $userId")
                         userViewModel.getUserById(userId)
                     }) {
                         Text("Thử lại")
@@ -249,226 +222,176 @@ fun ProfileScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .padding(16.dp)
                     ) {
-                        // Profile Image
-                        if (profileBitmap != null) {
-                            Image(
-                                bitmap = profileBitmap!!.asImageBitmap(),
-                                contentDescription = "Profile Picture",
-                                modifier = Modifier
-                                    .size(100.dp)
-                                    .clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Image(
-                                painter = painterResource(id = R.drawable.chef_avatar),
-                                contentDescription = "Profile Picture",
-                                modifier = Modifier
-                                    .size(100.dp)
-                                    .clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // User Name
+                        // Profile Title
                         Text(
-                            text = currentUser?.name ?: "Người dùng",
+                            text = "Profile",
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold
-                            )
+                            ),
+                            modifier = Modifier.padding(bottom = 24.dp)
                         )
 
-                        if (currentUser?.isChef == true) {
-                            Text(
-                                text = currentUser?.chefTitle ?: "",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        // Admin badge
-                        if (currentUser?.isAdmin == true) {
-                            Badge(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 4.dp)
-                            ) {
-                                Text(
-                                    "Admin",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Bio
-                        Text(
-                            text = currentUser?.bio ?: "Chưa có thông tin giới thiệu",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(horizontal = 32.dp),
-                            textAlign = TextAlign.Center
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Stats
+                        // Profile Image and Name
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Công thức
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            ) {
-                                Text(
-                                    text = userRecipes.size.toString(),
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                )
-                                Text(
-                                    text = "Công thức",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1
-                                )
-                            }
-
-                            // Bài viết
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            ) {
-                                Text(
-                                    text = userBlogs.size.toString(),
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                )
-                                Text(
-                                    text = "Bài viết",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1
-                                )
-                            }
-
-                            // Người theo dõi
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            ) {
-                                Text(
-                                    text = currentUser?.followers?.size?.toString() ?: "0",
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                )
-                                Text(
-                                    text = "Người theo dõi",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1
-                                )
-                            }
-
-                            // Đang theo dõi
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            ) {
-                                Text(
-                                    text = currentUser?.following?.size?.toString() ?: "0",
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                )
-                                Text(
-                                    text = "Đang theo dõi",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Edit Profile Button (only for current user) or Follow Button
-                        if (isCurrentUserProfile) {
-                            OutlinedButton(
-                                onClick = { navController.navigate("edit_profile") },
-                                modifier = Modifier.width(200.dp)
-                            ) {
-                                Text("Chỉnh sửa hồ sơ")
-                            }
-                        } else {
-                            Button(
-                                onClick = {
-                                    if (currentAuthUser != null) {
-                                        followButtonEnabled = false
-                                        coroutineScope.launch {
-                                            val success = if (isFollowing) {
-                                                userViewModel.unfollowUser(currentAuthUser.uid, userId)
-                                            } else {
-                                                userViewModel.followUser(currentAuthUser.uid, userId)
-                                            }
-
-                                            if (success) {
-                                                isFollowing = !isFollowing
-                                                val message = if (isFollowing) "Now following ${currentUser!!.name}" else "Unfollowed ${currentUser!!.name}"
-                                                snackbarHostState.showSnackbar(message)
-                                            } else {
-                                                snackbarHostState.showSnackbar("Failed to update follow status")
-                                            }
-                                            followButtonEnabled = true
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.width(200.dp),
-                                colors = if (isFollowing) {
-                                    ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.surface,
-                                        contentColor = MaterialTheme.colorScheme.primary
+                            // Profile Image with Camera Icon
+                            Box(contentAlignment = Alignment.BottomEnd) {
+                                if (profileBitmap != null) {
+                                    Image(
+                                        bitmap = profileBitmap!!.asImageBitmap(),
+                                        contentDescription = "Profile Picture",
+                                        modifier = Modifier
+                                            .size(100.dp)
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
                                     )
                                 } else {
-                                    ButtonDefaults.buttonColors()
+                                    Image(
+                                        painter = painterResource(id = R.drawable.chef_avatar),
+                                        contentDescription = "Profile Picture",
+                                        modifier = Modifier
+                                            .size(100.dp)
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
                                 }
-                            ) {
-                                Icon(
-                                    if (isFollowing) Icons.Default.Check else Icons.Default.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
+
+                                // Camera Icon
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF2196F3))
+                                        .padding(6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.CameraAlt,
+                                        contentDescription = "Change Profile Picture",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            // Name and Title
+                            Column {
+                                Text(
+                                    text = currentUser?.name ?: "Sarah Wilson",
+                                    style = MaterialTheme.typography.headlineSmall.copy(
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(if (isFollowing) "Đang theo dõi" else "Theo dõi")
+
+                                Text(
+                                    text = if (currentUser?.isChef == true)
+                                        currentUser?.chefTitle ?: "Food enthusiast & Recipe creator"
+                                    else
+                                        "Food enthusiast & Recipe creator",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = Color.Gray
+                                )
                             }
                         }
+                    }
 
-                        // Admin Panel Button (only for admins)
-                        if (isAdmin) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(
-                                onClick = { navController.navigate("admin_panel") },
-                                modifier = Modifier.width(200.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.tertiary
-                                )
-                            ) {
-                                Icon(
-                                    Icons.Default.AdminPanelSettings,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Admin Panel")
-                            }
+                    Divider()
+                }
+
+                // Stats Section
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        // Recipes
+                        StatItem(
+                            count = userRecipes.size,
+                            label = "Recipes"
+                        )
+
+                        // Blogs
+                        StatItem(
+                            count = userBlogs.size,
+                            label = "Blogs"
+                        )
+
+                        // Followers
+                        StatItem(
+                            count = currentUser?.followers?.size ?: 0,
+                            label = "Followers",
+                            isLargeNumber = true
+                        )
+
+                        // Following
+                        StatItem(
+                            count = currentUser?.following?.size ?: 0,
+                            label = "Following"
+                        )
+                    }
+
+                    Divider()
+                }
+
+                // Account Settings
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "ACCOUNT SETTINGS",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.Gray,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+
+                        // Personal Information
+                        SettingsItem(
+                            icon = Icons.Outlined.Person,
+                            title = "Personal Information",
+                            onClick = { navController.navigate("edit_profile") }
+                        )
+
+                        // Notifications
+                        SettingsItem(
+                            icon = Icons.Outlined.Notifications,
+                            title = "Notifications",
+                            onClick = { /* Navigate to notifications settings */ }
+                        )
+
+                        // Problem Report
+                        SettingsItem(
+                            icon = Icons.Outlined.Report,
+                            title = "Problem Report",
+                            onClick = { /* Navigate to problem report */ }
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // Log Out Button
+                        Button(
+                            onClick = { showLogoutDialog.value = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFFF7043)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "Log Out",
+                                style = MaterialTheme.typography.titleMedium
+                            )
                         }
                     }
 
@@ -479,13 +402,27 @@ fun ProfileScreen(
                 item {
                     TabRow(
                         selectedTabIndex = selectedTab,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        containerColor = Color(0xFFFFF8E1),
+                        contentColor = Color(0xFFFF7043),
+                        indicator = { tabPositions ->
+                            TabRowDefaults.Indicator(
+                                modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                height = 3.dp,
+                                color = Color(0xFFFF7043)
+                            )
+                        }
                     ) {
                         tabs.forEachIndexed { index, title ->
                             Tab(
                                 selected = selectedTab == index,
                                 onClick = { selectedTab = index },
-                                text = { Text(title) }
+                                text = {
+                                    Text(
+                                        title,
+                                        fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
                             )
                         }
                     }
@@ -500,23 +437,47 @@ fun ProfileScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(200.dp),
+                                        .height(200.dp)
+                                        .padding(16.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text(
-                                        text = if (isCurrentUserProfile)
-                                            "Bạn chưa tạo công thức nào. Hãy bắt đầu tạo công thức đầu tiên!"
-                                        else
-                                            "Người dùng này chưa tạo công thức nào.",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = Color.Gray
-                                    )
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Text(
+                                            text = "Bạn chưa tạo công thức nào. Hãy bắt đầu tạo công thức đầu tiên!",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = Color.Gray,
+                                            textAlign = TextAlign.Center
+                                        )
+
+                                        Spacer(modifier = Modifier.height(16.dp))
+
+                                        // Add refresh button
+                                        OutlinedButton(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    println("Manual refresh: Loading recipes for user ID: $userId")
+                                                    userViewModel.loadUserRecipes(userId)
+                                                }
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Refresh,
+                                                contentDescription = "Refresh"
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Refresh")
+                                        }
+                                    }
                                 }
                             } else {
                                 Spacer(modifier = Modifier.height(16.dp))
                             }
                         }
 
+                        // Display recipes in a grid (2 columns)
                         items(userRecipes.chunked(2)) { recipeRow ->
                             Row(
                                 modifier = Modifier
@@ -529,15 +490,11 @@ fun ProfileScreen(
                                         recipe = recipe,
                                         onClick = { navController.navigate("recipe_detail/${recipe.id}") },
                                         modifier = Modifier.weight(1f),
-                                        onDeleteClick = if (isCurrentUserProfile || isAdmin) {
+                                        onDeleteClick = if (isCurrentUserProfile) {
                                             {
-                                                if (isAdmin) {
-                                                    recipeViewModel.adminDeleteRecipe(recipe.id)
-                                                } else {
-                                                    currentAuthUser?.let { user ->
-                                                        recipeViewModel.deleteRecipe(recipe.id)
-                                                    }
-                                                }
+                                                recipeViewModel.deleteRecipe(recipe.id)
+                                                // Refresh recipes after deletion
+                                                userViewModel.loadUserRecipes(userId)
                                             }
                                         } else null
                                     )
@@ -559,16 +516,15 @@ fun ProfileScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(200.dp),
+                                        .height(200.dp)
+                                        .padding(16.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = if (isCurrentUserProfile)
-                                            "Bạn chưa tạo bài viết nào. Hãy bắt đầu viết bài đầu tiên!"
-                                        else
-                                            "Người dùng này chưa tạo bài viết nào.",
+                                        text = "Bạn chưa tạo bài viết nào. Hãy bắt đầu viết bài đầu tiên!",
                                         style = MaterialTheme.typography.bodyLarge,
-                                        color = Color.Gray
+                                        color = Color.Gray,
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             } else {
@@ -576,24 +532,21 @@ fun ProfileScreen(
                             }
                         }
 
+                        // Display blogs in a list
                         items(userBlogs) { blog ->
                             BlogItem(
                                 blog = blog,
                                 isOwner = isCurrentUserProfile,
-                                isAdmin = isAdmin,
+                                isAdmin = false, // We'll handle admin status separately
                                 onBlogClick = { navController.navigate("blog_detail/${blog.id}") },
                                 onEditClick = { navController.navigate("edit_blog/${blog.id}") },
                                 onDeleteClick = {
                                     coroutineScope.launch {
-                                        if (isAdmin) {
-                                            blogViewModel.adminDeleteBlogPost(blog.id)
-                                        } else {
-                                            currentAuthUser?.let { user ->
-                                                blogViewModel.deleteBlogPost(blog.id, user.uid)
-                                            }
+                                        currentAuthUser?.let { user ->
+                                            blogViewModel.deleteBlogPost(blog.id, user.uid)
+                                            // Refresh blogs after deletion
+                                            blogViewModel.loadUserBlogs(userId)
                                         }
-                                        blogViewModel.loadUserBlogs(userId)
-                                        snackbarHostState.showSnackbar("Blog post deleted")
                                     }
                                 }
                             )
@@ -602,7 +555,7 @@ fun ProfileScreen(
                     }
                 }
 
-                // Bottom spacing for FAB
+                // Bottom spacing
                 item {
                     Spacer(modifier = Modifier.height(80.dp))
                 }
@@ -612,133 +565,58 @@ fun ProfileScreen(
 }
 
 @Composable
-fun BlogItem(
-    blog: BlogPost,
-    isOwner: Boolean,
-    isAdmin: Boolean,
-    onBlogClick: () -> Unit,
-    onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
-) {
-    val context = LocalContext.current
-    var blogBitmap by remember { mutableStateOf<Bitmap?>(null) }
-
-    // Load blog image
-    LaunchedEffect(blog.imageUrl) {
-        if (blog.imageUrl.isNotEmpty()) {
-            try {
-                blogBitmap = LocalImageStorage.loadImage(context, blog.imageUrl)
-            } catch (e: Exception) {
-                // Handle error loading image
-            }
-        }
+fun StatItem(count: Int, label: String, isLargeNumber: Boolean = false) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = if (isLargeNumber && count > 1000)
+                String.format("%.1fK", count / 1000.0)
+            else
+                count.toString(),
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = FontWeight.Bold
+            )
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = Color.Gray
+        )
     }
+}
 
-    Card(
+@Composable
+fun SettingsItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    onClick: () -> Unit
+) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable { onBlogClick() },
-        shape = RoundedCornerShape(8.dp)
+            .clickable { onClick() }
+            .padding(vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            // Blog image
-            if (blogBitmap != null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
-                ) {
-                    Image(
-                        bitmap = blogBitmap!!.asImageBitmap(),
-                        contentDescription = blog.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(160.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.italian_pasta),
-                        contentDescription = blog.title,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color.DarkGray
+        )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                // Title
-                Text(
-                    text = blog.title,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold
-                    )
-                )
+        Spacer(modifier = Modifier.width(16.dp))
 
-                Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
 
-                // Summary
-                Text(
-                    text = blog.summary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Info row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Author and date
-                    Column {
-                        Text(
-                            text = "By ${blog.authorName}",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = "${blog.readTime} min read",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-
-                    // Actions for owner or admin
-                    if (isOwner || isAdmin) {
-                        Row {
-                            if (isOwner) {
-                                IconButton(onClick = onEditClick) {
-                                    Icon(
-                                        Icons.Default.Edit,
-                                        contentDescription = "Edit",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                            IconButton(onClick = onDeleteClick) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Delete",
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        Icon(
+            imageVector = Icons.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = Color.Gray
+        )
     }
 }

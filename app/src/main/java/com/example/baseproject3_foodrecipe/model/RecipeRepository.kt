@@ -215,15 +215,26 @@ class RecipeRepository {
     suspend fun getRecipesByAuthor(authorId: String): List<Recipe> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Fetching recipes by author ID: $authorId")
+
+            // Query recipes using the authorId field
             val snapshot = recipesCollection
                 .whereEqualTo("authorId", authorId)
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .get()
                 .await()
 
+            Log.d(TAG, "Query returned ${snapshot.documents.size} documents for author $authorId")
+
+            // Log each document for debugging
+            snapshot.documents.forEach { doc ->
+                Log.d(TAG, "Document ID: ${doc.id}, authorId: ${doc.getString("authorId")}")
+            }
+
             val recipes = snapshot.documents.mapNotNull { document ->
                 try {
-                    document.toObject(Recipe::class.java)
+                    val recipe = document.toObject(Recipe::class.java)
+                    Log.d(TAG, "Converted document to recipe: ${recipe?.name}")
+                    recipe
                 } catch (e: Exception) {
                     Log.e(TAG, "Error converting document to Recipe: ${e.message}")
                     null

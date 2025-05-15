@@ -43,6 +43,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlipCameraAndroid
 import androidx.compose.material.icons.filled.Restaurant
@@ -181,6 +182,22 @@ fun FoodRecognitionScreen(
                 isLoadingRecipes = false
             }
         }
+    }
+
+    // Function to format detected ingredients into a comma-separated list
+    fun getDetectedIngredientsText(): String {
+        return if (detections.isEmpty()) {
+            "không có nguyên liệu nào"
+        } else {
+            detections.joinToString(", ") { it.displayName }
+        }
+    }
+
+    // Function to navigate to chat screen with pre-filled message
+    fun askAIForRecipes() {
+        val ingredients = getDetectedIngredientsText()
+        val message = "Tôi có thể nấu món gì với $ingredients?"
+        navController.navigate("chat?message=$message")
     }
 
     Scaffold(
@@ -617,6 +634,63 @@ fun FoodRecognitionScreen(
                                     Text("Xem thêm công thức")
                                 }
                             }
+                        }
+                    }
+
+                    // Add "Ask AI" button at the bottom
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        if (!detections.isEmpty()) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "Hỏi AI về các món có thể nấu",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        text = "Nguyên liệu đã phát hiện: ${getDetectedIngredientsText()}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        textAlign = TextAlign.Center
+                                    )
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    Button(
+                                        onClick = { askAIForRecipes() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Chat,
+                                            contentDescription = null
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Hỏi AI làm món gì với nguyên liệu này")
+                                    }
+                                }
+                            }
+
+                            // Add some space at the bottom
+                            Spacer(modifier = Modifier.height(32.dp))
                         }
                     }
                 }

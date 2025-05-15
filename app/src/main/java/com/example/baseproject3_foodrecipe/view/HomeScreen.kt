@@ -144,18 +144,34 @@ fun HomeScreen(
             }
         }
 
-        // Camera FAB for food recognition
-        FloatingActionButton(
-            onClick = { navController.navigate("food_recognition") },
+        // FAB group
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp),
-            containerColor = MaterialTheme.colorScheme.primaryContainer
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.CameraAlt,
-                contentDescription = "Nhận diện thực phẩm"
-            )
+            // Chat FAB
+            FloatingActionButton(
+                onClick = { navController.navigate("chat") },
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Chat,
+                    contentDescription = "Trò chuyện với AI"
+                )
+            }
+
+            // Camera FAB for food recognition
+            FloatingActionButton(
+                onClick = { navController.navigate("food_recognition") },
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CameraAlt,
+                    contentDescription = "Nhận diện thực phẩm"
+                )
+            }
         }
     }
 }

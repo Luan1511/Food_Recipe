@@ -310,9 +310,7 @@ class RecipeViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Create a new recipe
-     */
+    // Enhance the createRecipe function to reload recipes after creation
     fun createRecipe(
         name: String,
         description: String,
@@ -371,6 +369,9 @@ class RecipeViewModel : ViewModel() {
                     _errorMessage.value = null
                     // Refresh recipes
                     loadAllRecipes()
+
+                    // Log the creation for debugging
+                    Log.d(TAG, "Recipe created with ID: $recipeId for author: $authorId")
                 } else {
                     Log.e(TAG, "Failed to create recipe")
                     _errorMessage.value = "Failed to create recipe"

@@ -279,6 +279,12 @@ fun FoodRecipeApp() {
                         userViewModel = viewModel()
                     )
                 }
+                composable("chat") {
+                    ChatScreen(
+                        navController = navController,
+                        apiKey = "sk-proj-VzrhhLc9-5z3Q2RTDXnUbvMCrqlbN6MM3wPETLzSo6gmmyqDERUtGqIIwB3WVezn7l6PP7UYjxT3Bl"
+                    )
+                }
             }
         }
     }

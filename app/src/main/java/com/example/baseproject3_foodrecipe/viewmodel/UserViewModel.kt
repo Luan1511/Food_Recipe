@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.example.baseproject3_foodrecipe.model.RecipeRepository
 
 class UserViewModel : ViewModel() {
     private val userRepository = UserRepository()
@@ -295,11 +296,13 @@ class UserViewModel : ViewModel() {
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                val recipes = userRepository.getRecipesByAuthor(userId)
+                val recipeRepository = RecipeRepository()
+                val recipes = recipeRepository.getRecipesByAuthor(userId)
                 _userRecipes.value = recipes
                 _errorMessage.value = null
             } catch (e: Exception) {
                 _errorMessage.value = "Error loading user recipes: ${e.message}"
+                _userRecipes.value = emptyList()
             } finally {
                 _isLoading.value = false
             }
