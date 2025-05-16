@@ -282,7 +282,15 @@ fun FoodRecipeApp() {
                 composable("chat") {
                     ChatScreen(
                         navController = navController,
-                        apiKey = "sk-proj-VzrhhLc9-5z3Q2RTDXnUbvMCrqlbN6MM3wPETLzSo6gmmyqDERUtGqIIwB3WVezn7l6PP7UYjxT3Bl"
+                        apiKey = "EOOIHIHI12E"
+                    )
+                }
+
+                // New refrigerator scan screen
+                composable("refrigerator_scan") {
+                    RefrigeratorScanScreen(
+                        navController = navController,
+//                        recipeViewModel = viewModel()
                     )
                 }
             }

@@ -325,14 +325,16 @@ fun ProfileScreen(
 
                         // Followers
                         StatItem(
-                            count = currentUser?.followers?.size ?: 0,
+//                            count = currentUser?.followers?.size ?: 0,
+                            count = 1,
                             label = "Followers",
                             isLargeNumber = true
                         )
 
                         // Following
                         StatItem(
-                            count = currentUser?.following?.size ?: 0,
+                            count = 11,
+//                            count = currentUser?.following?.size ?: 0,
                             label = "Following"
                         )
                     }
@@ -361,11 +363,11 @@ fun ProfileScreen(
                             onClick = { navController.navigate("edit_profile") }
                         )
 
-                        // Notifications
+                        // Scan Refrigerator
                         SettingsItem(
-                            icon = Icons.Outlined.Notifications,
-                            title = "Notifications",
-                            onClick = { /* Navigate to notifications settings */ }
+                            icon = Icons.Outlined.CameraAlt,
+                            title = "Scan Refrigerator",
+                            onClick = { navController.navigate("refrigerator_scan") }
                         )
 
                         // Problem Report

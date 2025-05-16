@@ -144,6 +144,8 @@ fun FoodRecognitionScreen(
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var processedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var detections by remember { mutableStateOf<List<FoodRecognitionHelper.Detection>>(emptyList()) }
+    detections.distinctBy { it.label }
+    detections.distinctBy { it.displayName }
     var isProcessing by remember { mutableStateOf(false) }
     var cameraSelector by remember { mutableStateOf(CameraSelector.DEFAULT_BACK_CAMERA) }
     var showRecipeDialog by remember { mutableStateOf(false) }
@@ -189,6 +191,8 @@ fun FoodRecognitionScreen(
         return if (detections.isEmpty()) {
             "không có nguyên liệu nào"
         } else {
+            detections.distinctBy { it.label }
+    detections.distinctBy { it.displayName }
             detections.joinToString(", ") { it.displayName }
         }
     }
@@ -276,6 +280,8 @@ fun FoodRecognitionScreen(
                                                         }
 
                                                         detections = results
+                                                        detections = detections.distinctBy { it.label }
+                                                        detections = detections.distinctBy { it.displayName }
 
                                                         // Draw bounding box on image
                                                         if (results.isNotEmpty()) {
@@ -862,6 +868,8 @@ private fun drawDetections(
     bitmap: Bitmap,
     detections: List<FoodRecognitionHelper.Detection>
 ): Bitmap {
+    detections.distinctBy { it.label }
+    detections.distinctBy { it.displayName }
     // Create a copy of bitmap to draw on
     val resultBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
     val canvas = Canvas(resultBitmap)

@@ -108,8 +108,8 @@ fun HomeContent(
         Spacer(modifier = Modifier.height(24.dp))
 
         // Categories Section
-        SectionTitle("Categories")
-        CategoriesSection(navController)
+//        SectionTitle("Categories")
+//        CategoriesSection(navController)
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -147,23 +147,23 @@ fun WelcomeSection() {
         Spacer(modifier = Modifier.height(16.dp))
 
         // Search Bar
-        OutlinedTextField(
-            value = "",
-            onValueChange = { },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("Search recipes...") },
-            leadingIcon = {
-                Icon(
-                    Icons.Default.Search,
-                    contentDescription = "Search"
-                )
-            },
-            shape = RoundedCornerShape(12.dp),
-            colors = TextFieldDefaults.outlinedTextFieldColors(
-                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = Color.LightGray
-            )
-        )
+//        OutlinedTextField(
+//            value = "",
+//            onValueChange = { },
+//            modifier = Modifier.fillMaxWidth(),
+//            placeholder = { Text("Search recipes...") },
+//            leadingIcon = {
+//                Icon(
+//                    Icons.Default.Search,
+//                    contentDescription = "Search"
+//                )
+//            },
+//            shape = RoundedCornerShape(12.dp),
+//            colors = TextFieldDefaults.outlinedTextFieldColors(
+//                focusedBorderColor = MaterialTheme.colorScheme.primary,
+//                unfocusedBorderColor = Color.LightGray
+//            )
+//        )
     }
 }
 

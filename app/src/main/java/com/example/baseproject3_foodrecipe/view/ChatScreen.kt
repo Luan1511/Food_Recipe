@@ -49,7 +49,8 @@ data class ChatMessage(
 @Composable
 fun ChatScreen(
     navController: NavController,
-    apiKey: String = "sk-abcxyz" // This is just a placeholder, the actual key is set by the user
+    apiKey: String = "sk-abcxyz", // This is just a placeholder, the actual key is set by the user
+    outMessage: String? = ""
 ) {
     // State for chat messages
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
@@ -102,7 +103,7 @@ fun ChatScreen(
                 // Create request
                 val request = Request.Builder()
                     .url("https://api.openai.com/v1/chat/completions")
-                    .addHeader("Authorization", "Bearer ${apiKey + temp + "RMStZj17TR51B9HJPbc5VmtAM"}_aNs6QPqz1XHIv0Jj$r")
+                    .addHeader("Authorization", "Bearer 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")
                     .addHeader("Content-Type", "application/json")
                     .post(requestBody)
                     .build()
