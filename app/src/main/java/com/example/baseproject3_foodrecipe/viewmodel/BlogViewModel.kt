@@ -74,7 +74,6 @@ class BlogViewModel : ViewModel() {
         }
     }
 
-    // Get all blogs for main blog list
     fun getAllBlogs() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -90,9 +89,6 @@ class BlogViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Load blogs created by a specific user
-     */
     fun loadUserBlogs(userId: String) {
         viewModelScope.launch {
             _isLoading.value = true

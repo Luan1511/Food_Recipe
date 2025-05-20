@@ -69,6 +69,11 @@ class UserViewModel : ViewModel() {
         }
     }
 
+    fun getUserId(userId: String): User? {
+        val user = userRepository.getUserNotSubSend(userId)
+        return user
+    }
+
     fun loadAllUsers() {
         viewModelScope.launch {
             _isLoading.value = true

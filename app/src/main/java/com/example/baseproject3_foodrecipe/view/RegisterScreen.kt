@@ -89,15 +89,13 @@ fun RegisterScreen(
 
                 // Logo
                 Image(
-                    painter = painterResource(id = R.drawable.chef_avatar),
+                    painter = painterResource(id = R.drawable.ic_cookii),
                     contentDescription = "Logo",
                     modifier = Modifier
-                        .size(100.dp)
+                        .size(150.dp)
                         .clip(RoundedCornerShape(50.dp)),
                     contentScale = ContentScale.Crop
                 )
-
-                Spacer(modifier = Modifier.height(16.dp))
 
                 // Tiêu đề
                 Text(

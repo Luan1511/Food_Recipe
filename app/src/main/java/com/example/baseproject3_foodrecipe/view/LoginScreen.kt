@@ -90,15 +90,13 @@ fun LoginScreen(
 
                 // Logo
                 Image(
-                    painter = painterResource(id = R.drawable.chef_avatar),
+                    painter = painterResource(id = R.drawable.ic_cookii),
                     contentDescription = "Logo",
                     modifier = Modifier
-                        .size(120.dp)
+                        .size(170.dp)
                         .clip(RoundedCornerShape(60.dp)),
                     contentScale = ContentScale.Crop
                 )
-
-                Spacer(modifier = Modifier.height(24.dp))
 
                 // Tiêu đề
                 Text(

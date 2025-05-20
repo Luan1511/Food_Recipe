@@ -72,15 +72,6 @@ fun generateQuantityForFood(foodName: String): String {
         foodName.contains("chicken", ignoreCase = true) -> "${Random.nextInt(200, 800)}g"
         foodName.contains("fish", ignoreCase = true) -> "${Random.nextInt(200, 800)}g"
         foodName.contains("fork", ignoreCase = true) -> "${Random.nextInt(200, 800)}g"
-        foodName.contains("beef", ignoreCase = true) -> "${Random.nextInt(200, 600)}g"
-        foodName.contains("milk", ignoreCase = true) -> "${Random.nextInt(1, 3)}L"
-        foodName.contains("cheese", ignoreCase = true) -> "${Random.nextInt(100, 500)}g"
-        foodName.contains("egg", ignoreCase = true) -> "${Random.nextInt(4, 12)} pieces"
-        foodName.contains("bread", ignoreCase = true) -> "${Random.nextInt(1, 3)} loaves"
-        foodName.contains("rice", ignoreCase = true) -> "${Random.nextInt(1, 5)}kg"
-        foodName.contains("pasta", ignoreCase = true) -> "${Random.nextInt(200, 800)}g"
-        foodName.contains("vegetable", ignoreCase = true) -> "${Random.nextInt(200, 800)}g"
-        foodName.contains("fruit", ignoreCase = true) -> "${Random.nextInt(200, 800)}g"
         else -> "${Random.nextInt(100, 500)}g"
     }
 }
@@ -94,7 +85,6 @@ fun RefrigeratorScanScreen(
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // State for ESP32-CAM connection
     var showIpDialog by remember { mutableStateOf(false) }
     var ipAddress by remember { mutableStateOf(TextFieldValue("192.168.1.")) }
     var isConnecting by remember { mutableStateOf(false) }
@@ -177,7 +167,7 @@ fun RefrigeratorScanScreen(
                     }
 
                     detectedFoodItems = foodItems
-                    detectedFoodItems = detectedFoodItems.distinctBy { it.name } 
+                    detectedFoodItems = detectedFoodItems.distinctBy { it.name }
 
                     // Find recipes that use the detected ingredients
                     findRecommendedRecipes(foodItems.map { it.name })
@@ -210,7 +200,7 @@ fun RefrigeratorScanScreen(
                     Log.d(TAG, "Testing connection to: $url")
 
                     val connection = url.openConnection() as HttpURLConnection
-                    connection.connectTimeout = 5000 // 5 seconds timeout
+                    connection.connectTimeout = 5000
                     connection.readTimeout = 5000
                     connection.requestMethod = "GET"
                     connection.setRequestProperty("Connection", "close")
@@ -219,7 +209,6 @@ fun RefrigeratorScanScreen(
                         val responseCode = connection.responseCode
                         Log.d(TAG, "Connection test response code: $responseCode")
 
-                        // Read response for debugging
                         val reader = BufferedReader(
                             InputStreamReader(
                                 if (responseCode >= 400) connection.errorStream else connection.inputStream
@@ -234,7 +223,6 @@ fun RefrigeratorScanScreen(
                         debugInfo = "Response: $responseCode\n${response.toString().take(200)}"
                         Log.d(TAG, "Response: $response")
 
-                        // Even if we get a 404, consider it connected if we can reach the server
                         if (responseCode == HttpURLConnection.HTTP_OK || responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
                             isConnected = true
                             connectionError = null
@@ -265,7 +253,6 @@ fun RefrigeratorScanScreen(
         navController.navigate("chat?message=")
     }
 
-    // Function to capture photo from ESP32-CAM
     fun capturePhoto() {
         if (!isConnected) {
             connectionError = "Not connected to ESP32-CAM"
@@ -279,12 +266,11 @@ fun RefrigeratorScanScreen(
         coroutineScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    // First, try to get the photo
                     val photoUrl = URL("http://${ipAddress.text}/photo")
                     Log.d(TAG, "Requesting photo from: $photoUrl")
 
                     val connection = photoUrl.openConnection() as HttpURLConnection
-                    connection.connectTimeout = 10000 // 10 seconds timeout
+                    connection.connectTimeout = 10000
                     connection.readTimeout = 10000
                     connection.requestMethod = "GET"
                     connection.setRequestProperty("Connection", "close")
@@ -297,7 +283,7 @@ fun RefrigeratorScanScreen(
                             // Get content type to verify it's an image
                             val contentType = connection.contentType
                             Log.d(TAG, "Content-Type: $contentType")
-
+5
                             if (contentType != null && contentType.startsWith("image/")) {
                                 val inputStream: InputStream = connection.inputStream
                                 cameraImage = BitmapFactory.decodeStream(inputStream)

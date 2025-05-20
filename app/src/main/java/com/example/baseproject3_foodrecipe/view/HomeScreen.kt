@@ -48,7 +48,6 @@ fun HomeScreen(
     val currentUser by userViewModel.currentUser.collectAsState()
     val firebaseUser by authViewModel.currentUser.collectAsState()
 
-    // Kiểm tra nếu chưa đăng nhập thì chuyển đến màn hình đăng nhập
     LaunchedEffect(firebaseUser) {
         if (firebaseUser == null) {
             navController.navigate("login") {
@@ -138,7 +137,7 @@ fun HomeScreen(
                 HomeContent(
                     modifier = Modifier.weight(1f),
                     navController = navController,
-                    featuredRecipes = recipes.filter { it.isFeatured },
+                    featuredRecipes = recipes.filter { it.featured },
                     popularRecipes = recipes.sortedByDescending { it.rating }.take(10)
                 )
             }

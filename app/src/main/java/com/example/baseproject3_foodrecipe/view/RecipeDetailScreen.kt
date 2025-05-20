@@ -30,8 +30,10 @@ import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.baseproject3_foodrecipe.R
 import com.example.baseproject3_foodrecipe.model.Recipe
+import com.example.baseproject3_foodrecipe.model.User
 import com.example.baseproject3_foodrecipe.ui.theme.md_extended_rating
 import com.example.baseproject3_foodrecipe.utils.LocalImageStorage
+import com.example.baseproject3_foodrecipe.viewmodel.AuthViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.CommentViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.RatingViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.RecipeViewModel
@@ -41,6 +43,8 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
+private const val TAG = "Recipe Screen"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipeDetailScreen(
@@ -49,11 +53,12 @@ fun RecipeDetailScreen(
     recipeViewModel: RecipeViewModel = viewModel(),
     userViewModel: UserViewModel = viewModel(),
     commentViewModel: CommentViewModel = viewModel(),
-    ratingViewModel: RatingViewModel = viewModel()
+    ratingViewModel: RatingViewModel = viewModel(),
+    authViewModel: AuthViewModel = viewModel()
 ) {
     val currentRecipe by recipeViewModel.currentRecipe.collectAsState()
     val isLoading by recipeViewModel.isLoading.collectAsState()
-    val currentUser by userViewModel.currentUser.collectAsState()
+    var currentUser: User? = null
     val comments by commentViewModel.comments.collectAsState()
     val userRating by ratingViewModel.userRating.collectAsState()
 
@@ -72,9 +77,11 @@ fun RecipeDetailScreen(
     // Load recipe data and check if it's bookmarked
     LaunchedEffect(recipeId, currentUser) {
         recipeViewModel.getRecipeById(recipeId)
+        currentUser = authViewModel.currentUser.value?.let { userViewModel.getUserId(it.uid) }
 
         currentUser?.id?.let { userId ->
             try {
+                // Check if recipe is bookmarked using the updated method
                 isBookmarked = recipeViewModel.isRecipeSaved(recipeId, userId)
                 ratingViewModel.getUserRatingForRecipe(userId, recipeId)
             } catch (e: Exception) {
@@ -103,11 +110,14 @@ fun RecipeDetailScreen(
             currentRating = userRating?.value?.toDouble() ?: 0.0,
             onDismiss = { showRatingDialog = false },
             onRateRecipe = { rating ->
-                currentUser?.id?.let { userId ->
+                val currentU = authViewModel.currentUser
+                val user = currentU.value?.let { userViewModel.getUserId(it.uid) }
+
+                user?.id?.let { userId ->
                     ratingViewModel.addRating(
                         recipeId = recipeId,
                         userId = userId,
-                        userName = currentUser?.name ?: "",
+                        userName = user?.name ?: "",
                         value = rating.toFloat(),
                         comment = ""
                     )
@@ -128,14 +138,19 @@ fun RecipeDetailScreen(
                 },
                 actions = {
                     IconButton(onClick = {
-                        currentUser?.id?.let { userId ->
+                        val currentU = authViewModel.currentUser
+                        val user = currentU.value?.let { userViewModel.getUserId(it.uid) }
+                        user?.id?.let { userId ->
+                            Log.d(TAG, "Toggling bookmark for recipe: $recipeId, user: $userId")
                             coroutineScope.launch {
                                 try {
                                     if (isBookmarked) {
+                                        // Use the updated unbookmark method that deletes from savedRecipes collection
                                         recipeViewModel.unbookmarkRecipe(recipeId, userId)
                                         isBookmarked = false
                                         snackbarHostState.showSnackbar("Recipe removed from saved")
                                     } else {
+                                        // Use the updated bookmark method that adds to savedRecipes collection
                                         recipeViewModel.bookmarkRecipe(recipeId, userId)
                                         isBookmarked = true
                                         snackbarHostState.showSnackbar("Recipe saved")
@@ -188,15 +203,22 @@ fun RecipeDetailScreen(
                 commentText = commentText,
                 onCommentTextChange = { commentText = it },
                 onAddComment = {
-                    if (commentText.isNotBlank() && currentUser != null) {
-                        commentViewModel.addComment(
-                            recipeId = recipeId,
-                            userId = currentUser!!.id,
-                            userName = currentUser!!.name,
-                            userProfileImage = currentUser!!.profileImageUrl,
-                            content = commentText
-                        )
+                    val currentU = authViewModel.currentUser
+                    val user = currentU.value?.let { userViewModel.getUserId(it.uid) }
+                    if (commentText.isNotBlank() && currentU != null) {
+                        currentU.value?.let {
+                            if (user != null) {
+                                commentViewModel.addComment(
+                                    recipeId = recipeId,
+                                    userId = it.uid,
+                                    userName = user.name,
+                                    userProfileImage = user.profileImageUrl,
+                                    content = commentText
+                                )
+                            }
+                        }
                         commentText = ""
+                        Log.d(TAG, "Added comment")
                     }
                 }
             )
@@ -220,6 +242,9 @@ fun RecipeDetailContent(
     onCommentTextChange: (String) -> Unit,
     onAddComment: () -> Unit
 ) {
+    val commentViewModel: CommentViewModel = viewModel()
+    val userViewModel: UserViewModel = viewModel()
+
     Column(
         modifier = modifier
             .fillMaxSize()

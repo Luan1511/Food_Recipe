@@ -1,5 +1,6 @@
 package com.example.baseproject3_foodrecipe.view
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,9 +30,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.baseproject3_foodrecipe.R
+import com.example.baseproject3_foodrecipe.model.AuthRepository
 import com.example.baseproject3_foodrecipe.model.Recipe
 import com.example.baseproject3_foodrecipe.model.YouTubeVideo
 import com.example.baseproject3_foodrecipe.utils.LocalImageStorage
+import com.example.baseproject3_foodrecipe.viewmodel.AuthViewModel
+import com.example.baseproject3_foodrecipe.viewmodel.RecipeViewModel
 import com.example.baseproject3_foodrecipe.viewmodel.YouTubeViewModel
 import kotlinx.coroutines.launch
 
@@ -40,7 +44,7 @@ fun HomeContent(
     modifier: Modifier = Modifier,
     navController: NavController,
     featuredRecipes: List<Recipe>,
-    popularRecipes: List<Recipe>
+    popularRecipes: List<Recipe>,
 ) {
     val scrollState = rememberScrollState()
     val youtubeViewModel: YouTubeViewModel = viewModel()
@@ -247,6 +251,7 @@ fun CategoryItem(
     }
 }
 
+@SuppressLint("StateFlowValueCalledInComposition")
 @Composable
 fun RecipeCardComponent(
     recipe: Recipe,
@@ -256,6 +261,8 @@ fun RecipeCardComponent(
     val context = LocalContext.current
     var recipeBitmap by remember { mutableStateOf<Any?>(null) }
     val coroutineScope = rememberCoroutineScope()
+    val recipeviewModel: RecipeViewModel = viewModel()
+    val authViewModel: AuthViewModel = viewModel()
 
     LaunchedEffect(recipe.imageUrl) {
         if (recipe.imageUrl.isNotEmpty()) {
@@ -319,6 +326,24 @@ fun RecipeCardComponent(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+
+            if (authViewModel.isAdmin.value){
+                Button(
+                    onClick = { recipeviewModel.deleteRecipe(recipe.id) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFF44336)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Delete",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
             }
         }
     }

@@ -1,24 +1,20 @@
 package com.example.baseproject3_foodrecipe.model
 
 import android.util.Log
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
-/**
- * Repository for managing recipes
- */
 class RecipeRepository {
     private val TAG = "RecipeRepository"
     private val db = FirebaseFirestore.getInstance()
     private val recipesCollection = db.collection("recipes")
     private val usersCollection = db.collection("users")
+    private val savedRecipesCollection = db.collection("savedRecipes")
 
-    /**
-     * Get all recipes
-     */
     suspend fun getAllRecipes(): List<Recipe> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Fetching all recipes")
@@ -52,9 +48,6 @@ class RecipeRepository {
         }
     }
 
-    /**
-     * Get featured recipes
-     */
     suspend fun getFeaturedRecipes(): List<Recipe> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Fetching featured recipes")
@@ -91,9 +84,6 @@ class RecipeRepository {
         }
     }
 
-    /**
-     * Get popular recipes
-     */
     suspend fun getPopularRecipes(): List<Recipe> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Fetching popular recipes")
@@ -129,16 +119,21 @@ class RecipeRepository {
         }
     }
 
-    /**
-     * Get saved recipes for a user
-     */
     suspend fun getSavedRecipes(userId: String): List<Recipe> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Fetching saved recipes for user: $userId")
-            val userDoc = usersCollection.document(userId).get().await()
-            val savedRecipeIds = userDoc.get("savedRecipes") as? List<String> ?: emptyList()
 
-            Log.d(TAG, "User has ${savedRecipeIds.size} saved recipes")
+            // Query the savedRecipes collection for documents where userId matches
+            val savedRecipesSnapshot = savedRecipesCollection
+                .whereEqualTo("userId", userId)
+                .get()
+                .await()
+
+            val savedRecipeIds = savedRecipesSnapshot.documents.mapNotNull { doc ->
+                doc.getString("recipeId")
+            }
+
+            Log.d(TAG, "User has ${savedRecipeIds.size} saved recipe IDs: $savedRecipeIds")
 
             if (savedRecipeIds.isEmpty()) {
                 return@withContext emptyList()
@@ -146,10 +141,10 @@ class RecipeRepository {
 
             val recipes = mutableListOf<Recipe>()
 
-            // Firestore has a limit of 10 items in a whereIn query, so we need to batch
+            // Firestore allows max 10 items in whereIn — chunk to avoid limit
             savedRecipeIds.chunked(10).forEach { chunk ->
                 val snapshot = recipesCollection
-                    .whereIn("id", chunk)
+                    .whereIn(FieldPath.documentId(), chunk)
                     .get()
                     .await()
 
@@ -173,9 +168,6 @@ class RecipeRepository {
         }
     }
 
-    /**
-     * Get a recipe by ID
-     */
     suspend fun getRecipeById(recipeId: String): Recipe? = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Fetching recipe with ID: $recipeId")
@@ -209,9 +201,6 @@ class RecipeRepository {
         }
     }
 
-    /**
-     * Get recipes by author ID
-     */
     suspend fun getRecipesByAuthor(authorId: String): List<Recipe> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Fetching recipes by author ID: $authorId")
@@ -249,9 +238,6 @@ class RecipeRepository {
         }
     }
 
-    /**
-     * Create a new recipe
-     */
     suspend fun createRecipe(recipe: Recipe): Boolean = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Creating new recipe: ${recipe.name}")
@@ -264,9 +250,6 @@ class RecipeRepository {
         }
     }
 
-    /**
-     * Update an existing recipe
-     */
     suspend fun updateRecipe(recipe: Recipe): Boolean = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Updating recipe: ${recipe.name}")
@@ -279,9 +262,6 @@ class RecipeRepository {
         }
     }
 
-    /**
-     * Delete a recipe
-     */
     suspend fun deleteRecipe(recipeId: String): Boolean = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Deleting recipe with ID: $recipeId")
@@ -294,16 +274,10 @@ class RecipeRepository {
         }
     }
 
-    /**
-     * Delete a recipe with admin privileges (no user check)
-     */
     suspend fun adminDeleteRecipe(recipeId: String): Boolean = withContext(Dispatchers.IO) {
         return@withContext deleteRecipe(recipeId)
     }
 
-    /**
-     * Search recipes by query
-     */
     suspend fun searchRecipes(query: String): List<Recipe> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Searching recipes with query: $query")
@@ -337,9 +311,6 @@ class RecipeRepository {
         }
     }
 
-    /**
-     * Get recipes by category
-     */
     suspend fun getRecipesByCategory(category: String): List<Recipe> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Fetching recipes by category: $category")
@@ -367,9 +338,6 @@ class RecipeRepository {
         }
     }
 
-    /**
-     * Get recipes by cuisine
-     */
     suspend fun getRecipesByCuisine(cuisine: String): List<Recipe> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Fetching recipes by cuisine: $cuisine")
@@ -397,69 +365,68 @@ class RecipeRepository {
         }
     }
 
-    /**
-     * Bookmark a recipe for a user
-     */
-    suspend fun bookmarkRecipe(recipeId: String, userId: String): Boolean = withContext(Dispatchers.IO) {
-        try {
-            Log.d(TAG, "Bookmarking recipe $recipeId for user $userId")
+    suspend fun bookmarkRecipe(recipeId: String, userId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Bookmarking recipe $recipeId for user $userId")
 
-            // Check if user document exists first
-            val userDoc = usersCollection.document(userId).get().await()
+                val savedRecipeId = "${userId}_$recipeId"
+                val savedRecipeDocRef = savedRecipesCollection.document(savedRecipeId)
 
-            if (!userDoc.exists()) {
-                // Create user document with savedRecipes array
-                val userData = mapOf(
-                    "id" to userId,
-                    "savedRecipes" to listOf(recipeId)
-                )
-                usersCollection.document(userId).set(userData).await()
-            } else {
-                // Update existing user document
-                usersCollection.document(userId).update(
-                    "savedRecipes", com.google.firebase.firestore.FieldValue.arrayUnion(recipeId)
-                ).await()
+                val doc = savedRecipeDocRef.get().await()
+
+                if (!doc.exists()) {
+                    val data = mapOf(
+                        "userId" to userId,
+                        "recipeId" to recipeId,
+                        "timestamp" to System.currentTimeMillis()
+                    )
+                    savedRecipeDocRef.set(data).await()
+                    Log.d(TAG, "Bookmark created: $savedRecipeId")
+                } else {
+                    Log.d(TAG, "Bookmark already exists: $savedRecipeId")
+                }
+
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error bookmarking recipe: ${e.message}", e)
+                false
             }
-
-            Log.d(TAG, "Recipe bookmarked successfully")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Error bookmarking recipe: ${e.message}", e)
-            false
         }
-    }
 
-    /**
-     * Remove a bookmark for a recipe
-     */
-    suspend fun unbookmarkRecipe(recipeId: String, userId: String): Boolean = withContext(Dispatchers.IO) {
-        try {
-            Log.d(TAG, "Unbookmarking recipe $recipeId for user $userId")
-            usersCollection.document(userId).update(
-                "savedRecipes", com.google.firebase.firestore.FieldValue.arrayRemove(recipeId)
-            ).await()
-            Log.d(TAG, "Recipe unbookmarked successfully")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Error unbookmarking recipe: ${e.message}")
-            false
-        }
-    }
+    suspend fun unbookmarkRecipe(recipeId: String, userId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Unbookmarking recipe $recipeId for user $userId")
 
-    /**
-     * Check if a recipe is saved by a user
-     */
-    suspend fun isRecipeSaved(recipeId: String, userId: String): Boolean = withContext(Dispatchers.IO) {
-        try {
-            Log.d(TAG, "Checking if recipe $recipeId is saved by user $userId")
-            val userDoc = usersCollection.document(userId).get().await()
-            val savedRecipes = userDoc.get("savedRecipes") as? List<String> ?: emptyList()
-            val isSaved = savedRecipes.contains(recipeId)
-            Log.d(TAG, "Recipe is saved: $isSaved")
-            return@withContext isSaved
-        } catch (e: Exception) {
-            Log.e(TAG, "Error checking if recipe is saved: ${e.message}")
-            return@withContext false
+                val savedRecipeId = "${userId}_$recipeId"
+                val savedRecipeDocRef = savedRecipesCollection.document(savedRecipeId)
+
+                savedRecipeDocRef.delete().await()
+                Log.d(TAG, "Recipe unbookmarked successfully")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error unbookmarking recipe: ${e.message}")
+                false
+            }
         }
-    }
+
+    suspend fun isRecipeSaved(recipeId: String, userId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Checking if recipe $recipeId is saved by user $userId")
+
+                val savedRecipeId = "${userId}_$recipeId"
+                val savedRecipeDocRef = savedRecipesCollection.document(savedRecipeId)
+
+                val doc = savedRecipeDocRef.get().await()
+                val isSaved = doc.exists()
+
+                Log.d(TAG, "Recipe is saved: $isSaved")
+                return@withContext isSaved
+            } catch (e: Exception) {
+                Log.e(TAG, "Error checking if recipe is saved: ${e.message}")
+                return@withContext false
+            }
+        }
 }

@@ -132,7 +132,6 @@ fun FoodRecognitionScreen(
     // Initialize FoodRecognitionHelper
     val foodRecognitionHelper = remember { FoodRecognitionHelper(context) }
 
-    // Clean up when screen is destroyed
     DisposableEffect(Unit) {
         onDispose {
             foodRecognitionHelper.close()
@@ -186,18 +185,16 @@ fun FoodRecognitionScreen(
         }
     }
 
-    // Function to format detected ingredients into a comma-separated list
     fun getDetectedIngredientsText(): String {
         return if (detections.isEmpty()) {
             "không có nguyên liệu nào"
         } else {
             detections.distinctBy { it.label }
-    detections.distinctBy { it.displayName }
+            detections.distinctBy { it.displayName }
             detections.joinToString(", ") { it.displayName }
         }
     }
 
-    // Function to navigate to chat screen with pre-filled message
     fun askAIForRecipes() {
         val ingredients = getDetectedIngredientsText()
         val message = "Tôi có thể nấu món gì với $ingredients?"

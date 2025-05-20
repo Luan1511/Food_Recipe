@@ -12,9 +12,6 @@ class BlogRepository {
     private val db = FirebaseFirestore.getInstance()
     private val blogsCollection = db.collection("blogs")
 
-    /**
-     * Get all blog posts
-     */
     suspend fun getAllBlogs(): List<BlogPost> {
         Log.d(TAG, "Getting all blogs")
         try {
@@ -32,9 +29,6 @@ class BlogRepository {
         }
     }
 
-    /**
-     * Get featured blog posts
-     */
     suspend fun getFeaturedBlogs(): List<BlogPost> {
         try {
             val snapshot = blogsCollection
@@ -50,9 +44,6 @@ class BlogRepository {
         }
     }
 
-    /**
-     * Get blog posts by author
-     */
     suspend fun getBlogsByAuthor(authorId: String): List<BlogPost> {
         try {
             val snapshot = blogsCollection
@@ -68,9 +59,6 @@ class BlogRepository {
         }
     }
 
-    /**
-     * Get blog posts by category
-     */
     suspend fun getBlogsByCategory(category: String): List<BlogPost> {
         try {
             val snapshot = blogsCollection
@@ -86,9 +74,6 @@ class BlogRepository {
         }
     }
 
-    /**
-     * Get a blog post by ID
-     */
     suspend fun getBlogById(blogId: String): BlogPost? {
         try {
             val document = blogsCollection.document(blogId).get().await()

@@ -1,10 +1,12 @@
 package com.example.baseproject3_foodrecipe.view
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BookmarkRemove
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -18,36 +20,150 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.example.baseproject3_foodrecipe.R
 import com.example.baseproject3_foodrecipe.model.Recipe
+import com.example.baseproject3_foodrecipe.utils.LocalImageStorage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun RecipeCardFromModel(
     recipe: Recipe,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onDeleteClick: (() -> Unit)? = null
+    onLongClick: (() -> Unit)? = null
 ) {
+    // State for showing confirmation dialog
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    // State for visual feedback during long press
+    var isLongPressed by remember { mutableStateOf(false) }
+
+    // Get haptic feedback
+    val haptic = LocalHapticFeedback.current
+
+    val context = LocalContext.current
+    var imageRecipe by remember { mutableStateOf<Bitmap?>(null) }
+
+    // Load user image in a coroutine
+    LaunchedEffect(Unit) {
+        if (recipe.imageUrl.isNotEmpty()) {
+            try {
+                imageRecipe = LocalImageStorage.loadImage(context, recipe.imageUrl)
+            } catch (e: Exception) {
+                // Handle error loading image
+            }
+        }
+    }
+
+    // Confirmation dialog
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Remove Bookmark") },
+            text = { Text("Are you sure you want to remove \"${recipe.name}\" from your bookmarks?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // Call the onLongClick function to delete the recipe
+                        onLongClick?.invoke()
+                        showDeleteDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            icon = {
+                Icon(
+                    Icons.Default.BookmarkRemove,
+                    contentDescription = "Remove Bookmark",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        )
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .height(240.dp)
-            .clickable { onClick() },
+            .then(
+                if (onLongClick != null) {
+                    Modifier.combinedClickable(
+                        onClick = { onClick() },
+                        onLongClick = {
+                            // Provide haptic feedback
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+
+                            // Show visual feedback
+                            isLongPressed = true
+
+                            // Use a coroutine to reset the visual feedback after a short delay
+                            CoroutineScope(Dispatchers.Main).launch {
+                                delay(200)
+                                isLongPressed = false
+
+                                // Show the confirmation dialog
+                                showDeleteDialog = true
+                            }
+                        }
+                    )
+                } else {
+                    Modifier.clickable { onClick() }
+                }
+            ),
         shape = RoundedCornerShape(12.dp)
     ) {
         Box(
             modifier = Modifier.fillMaxSize()
         ) {
             // Recipe Image
-            Image(
-                painter = painterResource(id = R.drawable.italian_pasta), // Placeholder, should use actual image
-                contentDescription = recipe.name,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(12.dp)),
-                contentScale = ContentScale.Crop
-            )
+            if (imageRecipe != null) {
+                Image(
+                    bitmap = imageRecipe!!.asImageBitmap(),
+                    contentDescription = recipe.name,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Gray),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Loading...",
+                        color = Color.White
+                    )
+                }
+            }
 
             // Gradient overlay for better text visibility
             Box(
@@ -106,7 +222,7 @@ fun RecipeCardFromModel(
             }
 
             // Featured badge
-            if (recipe.isFeatured) {
+            if (recipe.featured) {
                 Badge(
                     modifier = Modifier
                         .padding(8.dp)
@@ -128,19 +244,20 @@ fun RecipeCardFromModel(
                 }
             }
 
-            // Delete button (if provided)
-            if (onDeleteClick != null) {
-                IconButton(
-                    onClick = onDeleteClick,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(4.dp)
+            // Visual feedback overlay when long pressed
+            if (isLongPressed && onLongClick != null) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = Color.Black.copy(alpha = 0.5f)
                 ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = Color.White
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.BookmarkRemove,
+                            contentDescription = "Remove Bookmark",
+                            tint = Color.White,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
                 }
             }
         }

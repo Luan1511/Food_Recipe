@@ -1,6 +1,12 @@
 package com.example.baseproject3_foodrecipe.view
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,6 +44,20 @@ fun SearchScreen(
     val isLoading by searchViewModel.isLoading.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
 
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spokenText = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+
+            spokenText?.let {
+                searchQuery = it
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -54,33 +75,60 @@ fun SearchScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Search bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = {
-                    searchQuery = it
-                    searchViewModel.search(it)
-                },
-                placeholder = { Text("Search recipes, users...") },
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = "Search")
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = {
-                            searchQuery = ""
-                            searchViewModel.clearSearch()
-                        }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear")
-                        }
-                    }
-                },
+            // Search bar + Mic
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                singleLine = true
-            )
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = {
+                        searchQuery = it
+                        searchViewModel.search(it)
+                    },
+                    placeholder = { Text("Search recipes, users...") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Search")
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = {
+                                searchQuery = ""
+                                searchViewModel.clearSearch()
+                            }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp),
+                    singleLine = true
+                )
 
+                Spacer(modifier = Modifier.width(8.dp))
+
+                IconButton(
+                    onClick = {
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN")
+                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Bạn muốn hỏi gì?")
+                        }
+                        speechLauncher.launch(intent)
+                    },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF2196F3))
+                ) {
+                    Icon(Icons.Default.Mic, contentDescription = "Speech", tint = Color.White)
+                }
+            }
+
+            // Loading state
             if (isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -88,25 +136,27 @@ fun SearchScreen(
                 ) {
                     CircularProgressIndicator()
                 }
-            } else if (searchQuery.isNotEmpty() && searchResults.recipes.isEmpty() && searchResults.users.isEmpty()) {
+            }
+            // No result state
+            else if (searchQuery.isNotEmpty() && searchResults.recipes.isEmpty() && searchResults.users.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("No results found for \"$searchQuery\"")
                 }
-            } else {
+            }
+            // Show results
+            else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Recipes section
+                    // Recipes
                     if (searchResults.recipes.isNotEmpty()) {
                         item {
                             Text(
                                 text = "Recipes",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
                         }
@@ -120,14 +170,12 @@ fun SearchScreen(
                         }
                     }
 
-                    // Users section
+                    // Users
                     if (searchResults.users.isNotEmpty()) {
                         item {
                             Text(
                                 text = "Users",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
                         }
@@ -242,7 +290,7 @@ fun UserSearchItem(
     ) {
         // User avatar
         Image(
-            painter = painterResource(id = R.drawable.chef_avatar), // Use actual image in production
+            painter = painterResource(id = R.drawable.chef_avatar),
             contentDescription = user.name,
             modifier = Modifier
                 .size(50.dp)

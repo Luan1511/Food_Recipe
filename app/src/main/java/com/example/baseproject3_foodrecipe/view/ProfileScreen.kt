@@ -1,6 +1,7 @@
 package com.example.baseproject3_foodrecipe.view
 
 import android.graphics.Bitmap
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,7 +53,7 @@ fun ProfileScreen(
     blogViewModel: BlogViewModel = viewModel()
 ) {
     val currentUser by userViewModel.currentUser.collectAsState()
-    val userRecipes by userViewModel.userRecipes.collectAsState()
+    val userRecipes by recipeViewModel.userRecipes.collectAsState()
     val userBlogs by blogViewModel.userBlogs.collectAsState()
     val isLoading by userViewModel.isLoading.collectAsState()
     val errorMessage by userViewModel.errorMessage.collectAsState()
@@ -74,12 +75,10 @@ fun ProfileScreen(
     // Load user data
     LaunchedEffect(userId) {
         if (userId.isNotEmpty()) {
-            println("ProfileScreen: Loading data for user ID: $userId")
             userViewModel.getUserById(userId)
-            userViewModel.loadUserRecipes(userId)
+            recipeViewModel.loadUserRecipes(userId)
             blogViewModel.loadUserBlogs(userId)
-            println("ProfileScreen: userRecipes size: ${userViewModel.userRecipes.value.size}")
-            println("ProfileScreen: userBlogs size: ${blogViewModel.userBlogs.value.size}")
+//            userRecipes = recipeViewModel.
         }
     }
 
@@ -137,11 +136,9 @@ fun ProfileScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            // Only show FAB if user is viewing their own profile
             if (isCurrentUserProfile) {
                 when (selectedTab) {
                     0 -> {
-                        // FAB for creating a new recipe
                         FloatingActionButton(
                             onClick = {
                                 navController.navigate("create_recipe")
@@ -156,7 +153,6 @@ fun ProfileScreen(
                         }
                     }
                     1 -> {
-                        // FAB for creating a new blog
                         FloatingActionButton(
                             onClick = {
                                 currentAuthUser?.let { user ->
@@ -325,21 +321,44 @@ fun ProfileScreen(
 
                         // Followers
                         StatItem(
-//                            count = currentUser?.followers?.size ?: 0,
-                            count = 1,
+                            count = currentUser?.followers?.size ?: 0,
+//                            count = 1,
                             label = "Followers",
                             isLargeNumber = true
                         )
 
                         // Following
                         StatItem(
-                            count = 11,
-//                            count = currentUser?.following?.size ?: 0,
+//                            count = 11,
+                            count = currentUser?.following?.size ?: 0,
                             label = "Following"
                         )
                     }
 
                     Divider()
+                }
+
+                if (!isCurrentUserProfile) {
+                    item {
+                        Button(
+                            onClick = { userViewModel.currentUser.value?.let {
+                                userViewModel.followUser(
+                                    it.id, userId)
+                            } },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF4CAF50)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = "Follow",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                    }
                 }
 
                 // Account Settings
@@ -461,7 +480,7 @@ fun ProfileScreen(
                                             onClick = {
                                                 coroutineScope.launch {
                                                     println("Manual refresh: Loading recipes for user ID: $userId")
-                                                    userViewModel.loadUserRecipes(userId)
+                                                    recipeViewModel.loadUserRecipes(userId)
                                                 }
                                             }
                                         ) {
@@ -488,15 +507,16 @@ fun ProfileScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 recipeRow.forEach { recipe ->
+                                    Log.e("TAG", "Image URL: " + recipe.imageUrl)
                                     RecipeCardFromModel(
                                         recipe = recipe,
                                         onClick = { navController.navigate("recipe_detail/${recipe.id}") },
                                         modifier = Modifier.weight(1f),
-                                        onDeleteClick = if (isCurrentUserProfile) {
+                                        onLongClick = if (isCurrentUserProfile) {
                                             {
                                                 recipeViewModel.deleteRecipe(recipe.id)
                                                 // Refresh recipes after deletion
-                                                userViewModel.loadUserRecipes(userId)
+                                                recipeViewModel.loadUserRecipes(userId)
                                             }
                                         } else null
                                     )

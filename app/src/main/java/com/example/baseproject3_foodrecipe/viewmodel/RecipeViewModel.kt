@@ -5,9 +5,12 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.baseproject3_foodrecipe.model.BlogPost
 import com.example.baseproject3_foodrecipe.model.Recipe
 import com.example.baseproject3_foodrecipe.model.RecipeRepository
+import com.example.baseproject3_foodrecipe.model.User
 import com.example.baseproject3_foodrecipe.utils.LocalImageStorage
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +30,9 @@ class RecipeViewModel : ViewModel() {
 
     private val _featuredRecipes = MutableStateFlow<List<Recipe>>(emptyList())
     val featuredRecipes: StateFlow<List<Recipe>> = _featuredRecipes.asStateFlow()
+
+    private val _userRecipes = MutableStateFlow<List<Recipe>>(emptyList())
+    val userRecipes: StateFlow<List<Recipe>> = _userRecipes.asStateFlow()
 
     private val _popularRecipes = MutableStateFlow<List<Recipe>>(emptyList())
     val popularRecipes: StateFlow<List<Recipe>> = _popularRecipes.asStateFlow()
@@ -57,9 +63,6 @@ class RecipeViewModel : ViewModel() {
         loadPopularRecipes()
     }
 
-    /**
-     * Load all recipes from the repository
-     */
     fun loadAllRecipes() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -78,9 +81,21 @@ class RecipeViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Load featured recipes
-     */
+    fun loadUserRecipes(userId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val recipes = recipeRepository.getRecipesByAuthor(userId)
+                _userRecipes.value = recipes
+                _errorMessage.value = null
+            } catch (e: Exception) {
+                _errorMessage.value = "Error loading blogs: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     fun loadFeaturedRecipes() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -183,9 +198,6 @@ class RecipeViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Get a recipe by its ID
-     */
     fun getRecipeById(recipeId: String) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -204,9 +216,47 @@ class RecipeViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Search for recipes containing a specific ingredient
-     */
+    suspend fun getUserSavedRecipe(userId: String): List<Recipe> {
+        return try {
+            val db = FirebaseFirestore.getInstance()
+
+            // Bước 1: Lấy danh sách recipeId mà user đã bookmark
+            val savedRecipesSnapshot = db.collection("savedRecipes")
+                .whereEqualTo("userId", userId)
+                .get()
+                .await()
+
+            val recipeIds = savedRecipesSnapshot.documents.mapNotNull { it.getString("recipeId") }
+
+            if (recipeIds.isEmpty()) {
+                Log.e(TAG, "Saved Recipe getted: " + recipeIds.count())
+                return emptyList()
+            } else {
+                Log.e(TAG, "Saved Recipe getted: " + recipeIds.count())
+            }
+
+            // Bước 2: Lấy danh sách Recipe từ collection "recipes" dựa vào id
+            val recipes = mutableListOf<Recipe>()
+
+            // Firestore giới hạn 10 phần tử trong whereIn, nên cần chia nhỏ
+            recipeIds.chunked(10).forEach { chunk ->
+                val snapshot = db.collection("recipes")
+                    .whereIn(FieldPath.documentId(), chunk)
+                    .get()
+                    .await()
+
+                val chunkRecipes = snapshot.documents.mapNotNull { it.toObject(Recipe::class.java) }
+                recipes.addAll(chunkRecipes)
+            }
+
+            Log.e(TAG, "Saved Recipe getted final: " + recipes.count())
+            recipes
+        } catch (e: Exception) {
+            Log.e("RecipeRepository", "Error fetching saved recipes for user $userId: ${e.message}", e)
+            emptyList()
+        }
+    }
+
     suspend fun searchRecipesByIngredient(ingredient: String): List<Recipe> {
         return withContext(Dispatchers.IO) {
             try {

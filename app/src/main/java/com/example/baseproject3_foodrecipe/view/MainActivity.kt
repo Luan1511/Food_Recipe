@@ -1,6 +1,11 @@
 package com.example.baseproject3_foodrecipe.view
 
+import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
+import android.speech.RecognizerIntent
+import android.util.Log
+import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
@@ -37,10 +42,26 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        window.statusBarColor = Color.parseColor("#FFFFFF")
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == 1001 && resultCode == RESULT_OK && data != null) {
+            val result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val spokenText = result?.firstOrNull()
+
+            spokenText?.let {
+                // TODO: bạn có thể cập nhật inputText trong ChatScreen
+                Log.d("STT", "Văn bản bạn nói: $it")
+                // hoặc dùng 1 ViewModel để truyền vào ChatScreen
+            }
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FoodRecipeApp() {
     val navController = rememberNavController()

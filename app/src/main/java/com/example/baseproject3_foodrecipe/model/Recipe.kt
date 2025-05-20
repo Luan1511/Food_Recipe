@@ -3,13 +3,10 @@ package com.example.baseproject3_foodrecipe.model
 import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.PropertyName
 
-/**
- * Data class representing a recipe
- */
 data class Recipe(
     val creationDate: Long = 0,
     val nutritionInfo: NutritionInfo? = null,
-    val isFeatured: Boolean = false,
+//    val isFeatured: Boolean = false,
     val isPopular: Boolean = false,
 
     @DocumentId val id: String = "",
@@ -35,16 +32,12 @@ data class Recipe(
     val reviewCount: Int = 0,
     val youtubeVideoId: String = "",
 
-    // Use PropertyName annotation to map Firestore field names to properties
-    @get:PropertyName("isFeatured")
-    @set:PropertyName("isFeatured")
+//    @get:PropertyName("isFeatured")
+//    @set:PropertyName("isFeatured")
     var featured: Boolean = false,
 
     val createdAt: Long = System.currentTimeMillis()
 ) {
-    /**
-     * Data class for nutrition information
-     */
     data class NutritionInfo(
         val calories: Int = 0,
         val protein: Int = 0,

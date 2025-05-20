@@ -1,5 +1,15 @@
 package com.example.baseproject3_foodrecipe.view
 
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.speech.tts.TextToSpeech
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,20 +20,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.example.baseproject3_foodrecipe.utils.ChatStorageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,6 +45,9 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
+
+private lateinit var tts: TextToSpeech
+private const val TAG = "ChatScreen"
 
 data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),
@@ -49,26 +62,77 @@ data class ChatMessage(
 @Composable
 fun ChatScreen(
     navController: NavController,
-    apiKey: String = "sk-abcxyz", // This is just a placeholder, the actual key is set by the user
+    apiKey: String = "sk-abcxyz",
     outMessage: String? = ""
 ) {
+    val context = LocalContext.current
+    val chatStorageManager = remember { ChatStorageManager(context) }
+
     // State for chat messages
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
     var inputText by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    var showClearConfirmDialog by remember { mutableStateOf(false) }
 
     // For auto-scrolling to bottom
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
-    // Function to handle sending a message - Define this function before it's used
+    // Load saved messages when the screen is first displayed
+    LaunchedEffect(Unit) {
+        val savedMessages = chatStorageManager.loadConversation()
+        if (savedMessages.isNotEmpty()) {
+            messages = savedMessages
+            Log.d(TAG, "Loaded ${savedMessages.size} messages from storage")
+        } else {
+            // Add welcome message if no saved messages
+            val welcomeMessage = ChatMessage(
+                message = "Xin chào! Tôi là trợ lý ẩm thực AI. Bạn có thể hỏi tôi về công thức nấu ăn, mẹo nấu nướng, hoặc bất kỳ điều gì liên quan đến ẩm thực!",
+                isFromUser = false
+            )
+            messages = listOf(welcomeMessage)
+            chatStorageManager.saveConversation(messages)
+            Log.d(TAG, "No saved messages found, added welcome message")
+        }
+
+    }
+
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spokenText = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+
+            spokenText?.let {
+                inputText = it
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        tts = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts.language = Locale("vi", "VN")
+            }
+        }
+    }
+
     fun sendMessage(text: String) {
         if (text.isBlank()) return
 
         // Add user message
         val userMessage = ChatMessage(message = text, isFromUser = true)
         messages = messages + userMessage
+
+        // Save the updated conversation
+        coroutineScope.launch {
+            chatStorageManager.saveConversation(messages)
+            Log.d(TAG, "Saved conversation after adding user message")
+        }
+
         inputText = ""
         isLoading = true
         focusManager.clearFocus()
@@ -103,7 +167,7 @@ fun ChatScreen(
                 // Create request
                 val request = Request.Builder()
                     .url("https://api.openai.com/v1/chat/completions")
-                    .addHeader("Authorization", "Bearer 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")
+                    .addHeader("Authorization", "Bearer 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")
                     .addHeader("Content-Type", "application/json")
                     .post(requestBody)
                     .build()
@@ -128,13 +192,17 @@ fun ChatScreen(
                         // Add AI response
                         val aiMessage = ChatMessage(message = content, isFromUser = false)
                         messages = messages + aiMessage
+
+                        // Save the updated conversation with AI response
+                        chatStorageManager.saveConversation(messages)
+                        Log.d(TAG, "Saved conversation after adding AI response")
                     } else {
-                        // Handle empty response
                         val aiMessage = ChatMessage(
                             message = "Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau.",
                             isFromUser = false
                         )
                         messages = messages + aiMessage
+                        chatStorageManager.saveConversation(messages)
                     }
                 } else {
                     // Handle error response
@@ -152,6 +220,7 @@ fun ChatScreen(
                         errorCode = errorCode
                     )
                     messages = messages + aiMessage
+                    chatStorageManager.saveConversation(messages)
                 }
             } catch (e: Exception) {
                 // Handle exceptions
@@ -161,6 +230,7 @@ fun ChatScreen(
                     isError = true
                 )
                 messages = messages + aiMessage
+                chatStorageManager.saveConversation(messages)
             } finally {
                 isLoading = false
             }
@@ -175,14 +245,23 @@ fun ChatScreen(
         }
     }
 
-    // Initial welcome message
-    LaunchedEffect(Unit) {
-        messages = listOf(
-            ChatMessage(
-                message = "Xin chào! Tôi là trợ lý ẩm thực AI. Bạn có thể hỏi tôi về công thức nấu ăn, mẹo nấu nướng, hoặc bất kỳ điều gì liên quan đến ẩm thực!",
-                isFromUser = false
-            )
-        )
+    // Function to clear conversation history
+    fun clearConversation() {
+        coroutineScope.launch {
+            val success = chatStorageManager.deleteConversation()
+            if (success) {
+                // Add welcome message after clearing
+                val welcomeMessage = ChatMessage(
+                    message = "Xin chào! Tôi là trợ lý ẩm thực AI. Bạn có thể hỏi tôi về công thức nấu ăn, mẹo nấu nướng, hoặc bất kỳ điều gì liên quan đến ẩm thực!",
+                    isFromUser = false
+                )
+                messages = listOf(welcomeMessage)
+                chatStorageManager.saveConversation(messages)
+                Toast.makeText(context, "Đã xóa lịch sử trò chuyện", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(context, "Không thể xóa lịch sử trò chuyện", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     // Function to scroll to bottom when new message is added
@@ -192,6 +271,30 @@ fun ChatScreen(
         }
     }
 
+    // Confirmation dialog for clearing chat history
+    if (showClearConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirmDialog = false },
+            title = { Text("Xóa lịch sử trò chuyện") },
+            text = { Text("Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện không?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearConfirmDialog = false
+                        clearConversation()
+                    }
+                ) {
+                    Text("Xóa", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirmDialog = false }) {
+                    Text("Hủy")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -199,6 +302,12 @@ fun ChatScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    // Add clear history button
+                    IconButton(onClick = { showClearConfirmDialog = true }) {
+                        Icon(Icons.Default.Delete, contentDescription = "Xóa lịch sử")
                     }
                 }
             )
@@ -303,6 +412,33 @@ fun ChatScreen(
                             tint = Color.White
                         )
                     }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    IconButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN")
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Bạn muốn hỏi gì?")
+                                }
+                                speechLauncher.launch(intent)
+                            } catch (e: ActivityNotFoundException) {
+                                Toast.makeText(
+                                    context,
+                                    "Thiết bị của bạn không hỗ trợ nhận dạng giọng nói",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF2196F3))
+                    ) {
+                        Icon(Icons.Default.Mic, contentDescription = "Speech", tint = Color.White)
+                    }
                 }
             }
         }
@@ -325,11 +461,13 @@ fun ChatMessageItem(
         message.isFromUser -> Color(0xFF1565C0)
         else -> Color.DarkGray
     }
-    val dateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+    val dateFormat = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault())
     val timeString = dateFormat.format(Date(message.timestamp))
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
         horizontalAlignment = alignment
     ) {
         Box(
@@ -345,15 +483,17 @@ fun ChatMessageItem(
                 .background(backgroundColor)
                 .padding(12.dp)
         ) {
-            Column {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text(
                     text = message.message,
-                    color = textColor
+                    color = textColor,
+                    style = MaterialTheme.typography.bodyMedium
                 )
 
-                // Show retry button for error messages
+                // Retry Button
                 if (message.isError && onRetry != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
                     Button(
                         onClick = onRetry,
                         colors = ButtonDefaults.buttonColors(
@@ -370,6 +510,22 @@ fun ChatMessageItem(
                         Text("Thử lại")
                     }
                 }
+
+                // TTS button
+                if (!message.isFromUser) {
+                    IconButton(
+                        onClick = { speak(message.message) },
+                        modifier = Modifier
+                            .size(32.dp)
+                            .align(Alignment.End)
+                    ) {
+                        Icon(
+                            Icons.Default.VolumeUp,
+                            contentDescription = "Đọc",
+                            tint = Color.Gray
+                        )
+                    }
+                }
             }
         }
 
@@ -377,8 +533,16 @@ fun ChatMessageItem(
             text = timeString,
             style = MaterialTheme.typography.bodySmall,
             color = Color.Gray,
-            modifier = Modifier.padding(4.dp),
+            modifier = Modifier
+                .padding(horizontal = 8.dp, vertical = 2.dp),
             textAlign = if (message.isFromUser) TextAlign.End else TextAlign.Start
         )
     }
 }
+
+fun speak(text: String) {
+    if (::tts.isInitialized) {
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+    }
+}
+

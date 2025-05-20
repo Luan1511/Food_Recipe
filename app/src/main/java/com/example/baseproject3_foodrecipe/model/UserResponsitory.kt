@@ -23,7 +23,7 @@ class UserRepository {
             users.add(
                 User(
                     id = "sample_user_1",
-                    name = "John Doe",
+                    name = "Thai",
                     email = "john@example.com",
                     bio = "Food enthusiast and home chef",
                     profileImageUrl = "",
@@ -37,7 +37,7 @@ class UserRepository {
             users.add(
                 User(
                     id = "sample_user_2",
-                    name = "Jane Smith",
+                    name = "Luân",
                     email = "jane@example.com",
                     bio = "Professional pastry chef",
                     profileImageUrl = "",
@@ -50,7 +50,7 @@ class UserRepository {
             )
             users.add(
                 User(
-                    id = "sample_user_3",
+                    id = "Bếp thợ 3",
                     name = "Admin User",
                     email = "admin@example.com",
                     bio = "Site administrator",
@@ -133,6 +133,43 @@ class UserRepository {
         }
 
         return@withContext user
+    }
+
+    fun getUserNotSubSend(userId: String): User? {
+        // First check if this is the current Firebase user
+        val firebaseUser = auth.currentUser
+        if (firebaseUser != null && firebaseUser.uid == userId) {
+            // Return current user or create if not in cache
+            return getCurrentUser()
+        }
+
+        // Otherwise check our local cache
+        var user = users.find { it.id == userId }
+
+        // If not found and this is a valid Firebase user ID, try to get from Firebase
+        if (user == null) {
+            try {
+                // Create a default user with this ID if we can't find it
+                // In a real app, you would fetch from Firestore/database
+                user = User(
+                    id = userId,
+                    name = "User $userId",
+                    email = "user$userId@example.com",
+                    bio = "No bio available",
+                    profileImageUrl = "",
+                    followers = emptyList(),
+                    following = emptyList()
+                )
+
+                // Add to our local cache
+                users.add(user)
+            } catch (e: Exception) {
+                println("Error getting user: ${e.message}")
+                return null
+            }
+        }
+
+        return user
     }
 
     /**
