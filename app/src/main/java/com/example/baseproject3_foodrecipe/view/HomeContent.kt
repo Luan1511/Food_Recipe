@@ -111,9 +111,7 @@ fun HomeContent(
         }
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Categories Section
-//        SectionTitle("Categories")
-//        CategoriesSection(navController)
+//        SectionTitle(" Videos")
 
         Spacer(modifier = Modifier.height(24.dp))
 

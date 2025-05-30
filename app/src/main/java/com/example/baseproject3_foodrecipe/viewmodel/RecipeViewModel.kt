@@ -63,6 +63,21 @@ class RecipeViewModel : ViewModel() {
         loadPopularRecipes()
     }
 
+    fun getAllRecipes() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val blogs = recipeRepository.getAllRecipes()
+                _recipes.value = blogs
+                _errorMessage.value = null
+            } catch (e: Exception) {
+                _errorMessage.value = "Failed to load blogs: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     fun loadAllRecipes() {
         viewModelScope.launch {
             _isLoading.value = true

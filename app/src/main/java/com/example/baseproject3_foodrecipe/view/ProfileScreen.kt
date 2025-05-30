@@ -13,6 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.EmojiFoodBeverage
+import androidx.compose.material.icons.outlined.FeaturedPlayList
 import androidx.compose.material.icons.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
@@ -79,6 +81,7 @@ fun ProfileScreen(
             recipeViewModel.loadUserRecipes(userId)
             blogViewModel.loadUserBlogs(userId)
 //            userRecipes = recipeViewModel.
+//            if (currentUser!!.id == "hAgLMsfMUwMmDOPGQDknlNxKD4q2") currentUser!!.isAdmin = true
         }
     }
 
@@ -156,7 +159,7 @@ fun ProfileScreen(
                         FloatingActionButton(
                             onClick = {
                                 currentAuthUser?.let { user ->
-                                    navController.navigate("create_blog/${user.uid}/${user.displayName ?: "User"}")
+                                    navController.navigate("create_blog")
                                 }
                             },
                             containerColor = Color(0xFFFF7043),
@@ -390,13 +393,32 @@ fun ProfileScreen(
                         )
 
                         // Problem Report
-                        SettingsItem(
-                            icon = Icons.Outlined.Report,
-                            title = "Problem Report",
-                            onClick = { /* Navigate to problem report */ }
-                        )
+                        if (currentUser!!.id == "hAgLMsfMUwMmDOPGQDknlNxKD4q2") {
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                            Text(
+                                text = "ADMIN MANAGEMENT",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = Color.Gray,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+
+                            SettingsItem(
+                                icon = Icons.Outlined.FeaturedPlayList,
+                                title = "Blogs Management",
+                                onClick = {
+                                    navController.navigate("admin_blog")
+                                }
+                            )
+
+                            SettingsItem(
+                                icon = Icons.Outlined.EmojiFoodBeverage,
+                                title = "Recipes Management",
+                                onClick = {
+                                    navController.navigate("admin_recipe")
+                                }
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                        }
 
                         // Log Out Button
                         Button(

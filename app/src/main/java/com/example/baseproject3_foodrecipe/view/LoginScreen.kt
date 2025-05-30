@@ -52,7 +52,6 @@ fun LoginScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    // Kiểm tra nếu đã đăng nhập thì chuyển đến màn hình chính
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
             navController.navigate("home") {

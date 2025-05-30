@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import com.example.baseproject3_foodrecipe.model.RecipeRepository
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 
 class UserViewModel : ViewModel() {
     private val userRepository = UserRepository()
@@ -50,6 +52,20 @@ class UserViewModel : ViewModel() {
                 _errorMessage.value = "Failed to get current user: ${e.message}"
             } finally {
                 _isLoading.value = false
+            }
+        }
+    }
+
+    fun setAdmin(userId: String, isAdmin: Boolean) {
+        viewModelScope.launch {
+            try {
+                val userRef = FirebaseFirestore.getInstance().collection("users").document(userId)
+                userRef.update("isAdmin", isAdmin).await()
+//                Log.d("UserViewModel", "Admin updated for $userId")
+                // Cập nhật lại dữ liệu sau khi sửa
+                getUserById(userId)
+            } catch (e: Exception) {
+//                Log.e("UserViewModel", "Error updating admin status: ${e.message}")
             }
         }
     }

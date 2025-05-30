@@ -27,6 +27,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.baseproject3_foodrecipe.ui.theme.FoodRecipeTheme
+import com.example.baseproject3_foodrecipe.view.admins.BlogsManageScreen
+import com.example.baseproject3_foodrecipe.view.admins.RecipesManageScreen
 import com.example.baseproject3_foodrecipe.viewmodel.*
 
 class MainActivity : ComponentActivity() {
@@ -54,9 +56,7 @@ class MainActivity : ComponentActivity() {
             val spokenText = result?.firstOrNull()
 
             spokenText?.let {
-                // TODO: bạn có thể cập nhật inputText trong ChatScreen
                 Log.d("STT", "Văn bản bạn nói: $it")
-                // hoặc dùng 1 ViewModel để truyền vào ChatScreen
             }
         }
     }
@@ -310,6 +310,20 @@ fun FoodRecipeApp() {
                 // New refrigerator scan screen
                 composable("refrigerator_scan") {
                     RefrigeratorScanScreen(
+                        navController = navController,
+//                        recipeViewModel = viewModel()
+                    )
+                }
+                // New refrigerator scan screen
+                composable("admin_blog") {
+                    BlogsManageScreen(
+                        navController = navController,
+//                        recipeViewModel = viewModel()
+                    )
+                }
+
+                composable("admin_recipe") {
+                    RecipesManageScreen(
                         navController = navController,
 //                        recipeViewModel = viewModel()
                     )

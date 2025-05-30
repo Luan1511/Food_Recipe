@@ -86,7 +86,7 @@ fun RefrigeratorScanScreen(
     val context = LocalContext.current
 
     var showIpDialog by remember { mutableStateOf(false) }
-    var ipAddress by remember { mutableStateOf(TextFieldValue("192.168.1.")) }
+    var ipAddress by remember { mutableStateOf(TextFieldValue("192.168.19.187")) }
     var isConnecting by remember { mutableStateOf(false) }
     var isConnected by remember { mutableStateOf(false) }
     var connectionError by remember { mutableStateOf<String?>(null) }
